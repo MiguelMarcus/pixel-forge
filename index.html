@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pixel Forge — conformador de assets</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="name">PIXEL FORGE</span>
+    <span class="tag">v1.4 · local</span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="sprite" type="button">Sprite</button>
+    <button class="tab-btn" data-tab="library" type="button">Biblioteca <span class="tab-count" id="libCount">0</span></button>
+    <button class="tab-btn" data-tab="sheet" type="button">Folha</button>
+    <button class="tab-btn" data-tab="shadow" type="button">Sombra</button>
+  </nav>
+  <div class="topbar-hint">Arraste uma imagem, cole com <kbd>Ctrl</kbd>+<kbd>V</kbd>, ou use um exemplo</div>
+</header>
+
+<main class="app-main">
+
+  <!-- ==================================================================== -->
+  <!-- ABA SPRITE                                                           -->
+  <!-- ==================================================================== -->
+  <section class="tab-panel" id="tab-sprite">
+  <div class="layout">
+
+  <!-- ============================= ESQUERDA ============================= -->
+  <aside class="col left">
+
+    <section class="panel">
+      <h2>Aplicação</h2>
+      <div class="profiles" id="profiles"></div>
+      <p class="profile-note" id="profileNote">—</p>
+    </section>
+
+    <section class="panel">
+      <h2>Entrada</h2>
+
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <div class="dz-icon" aria-hidden="true">▣</div>
+        <div class="dz-title">Solte um PNG / JPG aqui</div>
+        <div class="dz-sub">ou clique para escolher</div>
+        <input type="file" id="fileInput" accept="image/*" multiple hidden />
+      </label>
+
+      <div class="source-name" id="fileName">nenhuma imagem</div>
+
+      <div class="row gap">
+        <button class="btn ghost sm" id="samplePotion" type="button">Exemplo: poção</button>
+        <button class="btn ghost sm" id="sampleSlime" type="button">Exemplo: slime</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Fundo</h2>
+      <label class="check">
+        <input type="checkbox" id="bgRemove" />
+        <span>Remover fundo (flood fill pelas bordas)</span>
+      </label>
+      <div id="bgOpts" class="sub">
+        <div class="row">
+          <label class="mini">cor</label>
+          <input type="color" id="bgColor" value="#ffffff" />
+          <label class="mini grow">tolerância <b id="bgTolVal">32</b></label>
+          <input type="range" id="bgTol" min="0" max="120" value="32" />
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Grade</h2>
+
+      <div id="sizeSquare">
+        <div class="seg" id="sizeSeg">
+          <button type="button" data-size="16">16</button>
+          <button type="button" data-size="32">32</button>
+          <button type="button" data-size="48">48</button>
+          <button type="button" data-size="64" class="active">64</button>
+        </div>
+        <div class="row">
+          <label class="mini">custom</label>
+          <input type="number" id="sizeCustom" class="num" min="4" max="256" step="1" value="64" />
+          <span class="mini">px</span>
+        </div>
+      </div>
+
+      <div id="sizeRect" class="hidden">
+        <label class="field">
+          <span>Resolução</span>
+          <select id="bgPreset">
+            <option value="320x180">320 × 180 · 16:9</option>
+            <option value="384x216">384 × 216 · 16:9</option>
+            <option value="480x270">480 × 270 · 16:9</option>
+            <option value="512x288">512 × 288 · 16:9</option>
+            <option value="640x360">640 × 360 · 16:9</option>
+            <option value="custom">custom</option>
+          </select>
+        </label>
+        <div class="row">
+          <input type="number" id="sizeW" class="num" min="8" max="1024" value="320" />
+          <span class="mini">×</span>
+          <input type="number" id="sizeH" class="num" min="8" max="1024" value="180" />
+          <span class="mini">px</span>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Encaixe</span>
+        <select id="fitMode">
+          <option value="contain">conter (sprite)</option>
+          <option value="cover">cobrir (fundo)</option>
+          <option value="stretch">esticar</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Amostragem</span>
+        <select id="resampleMode">
+          <option value="dominant">dominante (recomendado)</option>
+          <option value="box">média (box)</option>
+          <option value="nearest">mais próximo</option>
+        </select>
+      </label>
+
+      <label class="check"><input type="checkbox" id="autoCrop" checked /><span>Recortar ao conteúdo</span></label>
+
+      <div id="parallaxOpts" class="sub hidden">
+        <div class="row">
+          <label class="mini grow">parallax <b id="scrollVal">0.50</b></label>
+          <input type="range" id="scrollFactor" min="0" max="1" step="0.05" value="0.5" />
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Paleta</h2>
+      <label class="field">
+        <span>Preset</span>
+        <select id="palettePreset"></select>
+      </label>
+
+      <div id="customWrap" class="sub hidden">
+        <textarea id="paletteCustom" rows="3" spellcheck="false"
+          placeholder="#1a1c2c #b13e53 #ef7d57 ..."></textarea>
+      </div>
+
+      <div class="field">
+        <span>da imagem</span>
+        <div class="row">
+          <select id="extractMode" class="select-sm grow" title="como a paleta é extraída">
+            <option value="dominant">dominante</option>
+            <option value="spread">distribuída</option>
+          </select>
+          <input type="number" id="extractCount" class="num sm" min="2" max="64" value="12" title="cores" />
+          <button class="btn ghost sm" id="extractBtn" type="button">extrair</button>
+        </div>
+      </div>
+
+      <div class="swatches" id="swatches"></div>
+      <div class="palette-meta" id="paletteMeta">—</div>
+      <button class="btn ghost sm block pick-btn" id="pickColor" type="button">+ cor da imagem</button>
+    </section>
+
+    <section class="panel">
+      <h2>Pixel</h2>
+
+      <label class="field">
+        <span>Dithering</span>
+        <select id="ditherMode">
+          <option value="none">nenhum</option>
+          <option value="ordered">ordenado (Bayer 4×4)</option>
+          <option value="blue">blue noise</option>
+          <option value="fs">Floyd–Steinberg</option>
+        </select>
+      </label>
+      <div class="row hidden" id="ditherAmountWrap">
+        <label class="mini grow">força <b id="ditherVal">50%</b></label>
+        <input type="range" id="ditherAmount" min="0" max="100" value="50" />
+      </div>
+
+      <div class="row">
+        <label class="mini grow">limiar de alpha <b id="alphaVal">128</b></label>
+        <input type="range" id="alphaThresh" min="1" max="254" value="128" />
+      </div>
+
+      <label class="field">
+        <span>Silhueta (sombra)</span>
+        <select id="silhouette">
+          <option value="off">não</option>
+          <option value="black">preto</option>
+          <option value="white">branco</option>
+        </select>
+      </label>
+
+      <label class="check"><input type="checkbox" id="outlineOn" checked /><span>Borda na silhueta</span></label>
+      <div id="outlineOpts" class="sub">
+        <div class="row">
+          <label class="mini">largura</label>
+          <input type="number" id="outlineWidth" class="num sm" min="1" max="8" value="1" />
+          <label class="mini">px</label>
+          <label class="check tight"><input type="checkbox" id="outlineAuto" checked /><span>cor auto</span></label>
+        </div>
+        <div class="row gap" id="outlineColorRow">
+          <label class="mini grow">cor da borda</label>
+          <input type="color" id="outlineColor" value="#101018" />
+        </div>
+        <div class="row gap">
+          <label class="check tight"><input type="checkbox" id="outlineInner" /><span>para dentro</span></label>
+          <label class="check tight"><input type="checkbox" id="outlineDiag" /><span>8 direções</span></label>
+        </div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="orphanCleanup" checked /><span>Limpar pixels órfãos</span></label>
+      <label class="check"><input type="checkbox" id="killBW" /><span>Apagar pretos e brancos</span></label>
+      <div id="killBWOpts" class="sub hidden">
+        <div class="row">
+          <label class="mini grow">tolerância <b id="killBWVal">12</b></label>
+          <input type="range" id="killBWTol" min="0" max="80" value="12" />
+        </div>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ============================= CENTRO ============================= -->
+  <section class="col stage">
+    <div class="stage-head">
+      <div class="stage-title">
+        <span id="stageDims">—</span>
+        <span class="stage-sub" id="stageInfo"></span>
+      </div>
+      <div class="stage-tools">
+        <button class="btn icon" id="zoomOut" type="button" title="Menos zoom">−</button>
+        <span class="zoom-label" id="zoomLabel">1×</span>
+        <button class="btn icon" id="zoomIn" type="button" title="Mais zoom">+</button>
+        <button class="btn ghost sm" id="zoomFit" type="button">ajustar</button>
+        <button class="btn ghost sm" id="gridToggle" type="button" title="Grade">grade</button>
+        <button class="btn ghost sm" id="compareToggle" type="button" title="Comparar com o original">comparar</button>
+      </div>
+    </div>
+
+    <div class="stage-body" id="stageBody">
+      <div class="empty" id="emptyState">
+        <div class="empty-mark">▣</div>
+        <p>Nenhuma imagem carregada.</p>
+        <p class="dim">Solte um arquivo, cole da área de transferência, ou clique em um dos exemplos.</p>
+      </div>
+
+      <div class="compare hidden" id="compare">
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="checker" id="checker"></div>
+          <canvas id="outCanvas"></canvas>
+          <div class="src-clip" id="srcClip">
+            <canvas id="srcCanvas"></canvas>
+          </div>
+          <div class="grid-overlay" id="gridOverlay"></div>
+          <div class="divider" id="divider"><span class="knob"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-foot">
+      <span id="footLeft">pipeline determinístico · roda do mouse = zoom</span>
+      <span id="footRight"></span>
+    </div>
+  </section>
+
+  <!-- ============================= DIREITA ============================= -->
+  <aside class="col right">
+
+    <section class="panel">
+      <h2>Projeto</h2>
+      <button class="btn primary block" id="saveToLibrary" type="button" disabled>Salvar na biblioteca</button>
+      <p class="export-note" id="projNote">0 assets salvos</p>
+    </section>
+
+    <section class="panel">
+      <h2>Contrato</h2>
+      <div class="contract-grid">
+        <label class="field tight">
+          <span>máx. cores</span>
+          <input type="number" id="contractColors" class="num" min="1" max="64" value="16" />
+        </label>
+        <label class="field tight">
+          <span>dist. mínima</span>
+          <input type="number" id="contractDistance" class="num" min="0" max="441" value="16" />
+        </label>
+        <label class="field tight">
+          <span>máx. órfãos</span>
+          <input type="number" id="contractOrphans" class="num" min="0" max="99" value="0" />
+        </label>
+        <label class="check tight self-end">
+          <input type="checkbox" id="contractOutline" checked /><span>exigir outline</span>
+        </label>
+        <label class="check tight self-end">
+          <input type="checkbox" id="contractMargin" /><span>exigir margem</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Validação</h2>
+        <span class="verdict" id="verdict">—</span>
+      </div>
+      <div class="checks" id="checks"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Estatísticas</h2>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Exportar</h2>
+      <button class="btn primary block" id="exportPng" type="button" disabled>
+        PNG indexado <span class="btn-hint">1×</span>
+      </button>
+      <div class="export-grid">
+        <button class="btn ghost" id="exportAseprite" type="button" disabled>Aseprite</button>
+        <button class="btn ghost" id="exportPng8" type="button" disabled>PNG 8×</button>
+        <button class="btn ghost" id="exportGpl" type="button" disabled>.gpl</button>
+        <button class="btn ghost" id="exportJson" type="button" disabled>manifesto</button>
+      </div>
+      <button class="btn ghost block sm" id="copyPalette" type="button" disabled>copiar cores (hex)</button>
+      <p class="export-note">
+        O PNG sai em <b>colorType 3</b> (indexado). Por construção, ele não consegue
+        conter uma cor fora da paleta.
+      </p>
+    </section>
+
+  </aside>
+  </div>
+  </section>
+
+  <!-- ==================================================================== -->
+  <!-- ABA BIBLIOTECA                                                       -->
+  <!-- ==================================================================== -->
+  <section class="tab-panel hidden" id="tab-library">
+    <div class="library-wrap">
+      <div class="library-head">
+        <div>
+          <div class="lib-title">Biblioteca</div>
+          <div class="lib-sub" id="libTotal">0 assets</div>
+        </div>
+        <div class="lib-actions">
+          <button class="btn ghost sm" id="libOpenFile" type="button">abrir .pfset</button>
+          <button class="btn ghost sm" id="libSaveFile" type="button">salvar .pfset</button>
+          <button class="btn ghost sm" id="libReapply" type="button" title="aplica o contrato atual aos assets deste perfil">reaplicar contrato</button>
+          <button class="btn ghost sm" id="libClear" type="button">esvaziar</button>
+          <input type="file" id="libFileInput" accept=".pfset,.json,application/json" hidden />
+        </div>
+      </div>
+
+      <div class="lib-grid" id="libGrid"></div>
+
+      <div class="lib-empty" id="libEmpty">
+        <div class="empty-mark">▤</div>
+        <p>Biblioteca vazia.</p>
+        <p class="dim">Conforme um sprite na aba <b>Sprite</b> e clique em “Salvar na biblioteca”.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================== -->
+  <!-- ABA FOLHA                                                            -->
+  <!-- ==================================================================== -->
+  <section class="tab-panel hidden" id="tab-sheet">
+    <div class="layout">
+
+      <aside class="col left">
+        <section class="panel">
+          <h2>Montagem</h2>
+
+          <div class="seg" id="sheetMode">
+            <button type="button" data-mode="grid" class="active">Grade</button>
+            <button type="button" data-mode="ruler">Régua</button>
+          </div>
+
+          <div class="row">
+            <label class="mini">larg</label>
+            <input type="number" id="sheetW" class="num" min="16" max="2048" value="512" />
+            <label class="mini">alt</label>
+            <input type="number" id="sheetH" class="num" min="16" max="2048" value="512" />
+          </div>
+
+          <div class="row gap" id="cellRow">
+            <label class="mini grow">célula</label>
+            <input type="number" id="sheetCell" class="num" min="8" max="256" value="32" />
+            <span class="mini">px</span>
+          </div>
+
+          <div class="row gap hidden" id="baselineRow">
+            <label class="mini grow">linha de base</label>
+            <input type="number" id="sheetBaseline" class="num" min="0" max="2048" value="480" />
+          </div>
+
+          <label class="check"><input type="checkbox" id="sheetSnap" checked /><span>Ajustar à grade</span></label>
+          <button class="btn ghost block sm" id="sheetClear" type="button">limpar folha</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Validação</h2>
+            <span class="verdict" id="sheetVerdict">—</span>
+          </div>
+          <div class="checks" id="sheetChecks"></div>
+        </section>
+      </aside>
+
+      <section class="col stage">
+        <div class="stage-head">
+          <div class="stage-title">
+            <span id="sheetDims">512×512</span>
+            <span class="stage-sub" id="sheetInfo"></span>
+          </div>
+          <div class="stage-tools">
+            <button class="btn icon" id="sheetZoomOut" type="button">−</button>
+            <span class="zoom-label" id="sheetZoomLabel">1×</span>
+            <button class="btn icon" id="sheetZoomIn" type="button">+</button>
+            <button class="btn ghost sm" id="sheetFit" type="button">ajustar</button>
+          </div>
+        </div>
+
+        <div class="stage-body" id="sheetBody">
+          <div class="sheet-wrap" id="sheetWrap">
+            <div class="checker"></div>
+            <canvas id="sheetCanvas"></canvas>
+            <div class="sheet-empty" id="sheetEmpty">arraste um asset da biblioteca para cá</div>
+          </div>
+        </div>
+
+        <div class="stage-foot">
+          <span>arraste para mover · clique direito remove · roda = zoom</span>
+          <span id="sheetFoot"></span>
+        </div>
+      </section>
+
+      <aside class="col right">
+        <section class="panel">
+          <h2>Assets <span class="mini" id="sheetAssetCount"></span></h2>
+          <div class="asset-list" id="sheetAssets"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Seleção</h2>
+          <div class="stats" id="sheetSel"></div>
+          <div class="row gap">
+            <input type="number" id="sheetReformSize" class="num" min="8" max="256" value="32" />
+            <button class="btn ghost grow" id="sheetReform" type="button" disabled>reconformar</button>
+          </div>
+          <button class="btn ghost block sm" id="sheetRemove" type="button" disabled>remover da folha</button>
+        </section>
+
+        <section class="panel">
+          <h2>Exportar folha</h2>
+          <button class="btn primary block" id="sheetExportPng" type="button" disabled>PNG indexado</button>
+          <div class="export-grid">
+            <button class="btn ghost" id="sheetExportJson" type="button" disabled>JSON de frames</button>
+            <button class="btn ghost" id="sheetExportAseprite" type="button" disabled>Aseprite</button>
+          </div>
+          <p class="export-note" id="sheetNote">
+            A folha tem paleta única (união das paletas) e sai indexada, como os sprites.
+          </p>
+        </section>
+      </aside>
+
+    </div>
+  </section>
+  <!-- ==================================================================== -->
+  <!-- ABA SOMBRA                                                           -->
+  <!-- ==================================================================== -->
+  <section class="tab-panel hidden" id="tab-shadow">
+    <div class="layout">
+
+      <aside class="col left">
+        <section class="panel">
+          <h2>Origem</h2>
+          <label class="field">
+            <span>Sprite da biblioteca</span>
+            <select id="shadowAsset"></select>
+          </label>
+          <p class="export-note" id="shadowEmpty">Salve um sprite na Biblioteca primeiro.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Sombra</h2>
+
+          <label class="field">
+            <span>Forma</span>
+            <select id="shadowShape">
+              <option value="ellipse">elipse (chão)</option>
+              <option value="silhouette">silhueta achatada</option>
+            </select>
+          </label>
+
+          <div class="row">
+            <label class="mini grow">largura <b id="shadowWidthVal">100%</b></label>
+            <input type="range" id="shadowWidth" min="40" max="200" value="100" />
+          </div>
+
+          <div class="row">
+            <label class="mini grow">achatamento <b id="shadowSquashVal">35%</b></label>
+            <input type="range" id="shadowSquash" min="10" max="100" value="35" />
+          </div>
+
+          <div class="row">
+            <label class="mini">deslocar</label>
+            <input type="number" id="shadowDX" class="num sm" min="-128" max="128" value="0" title="X" />
+            <label class="mini">x</label>
+            <input type="number" id="shadowDY" class="num sm" min="-128" max="128" value="0" title="Y" />
+            <label class="mini">y</label>
+          </div>
+
+          <div class="row gap">
+            <label class="mini grow">espaço abaixo <b id="shadowPadVal">8</b> px</label>
+            <input type="range" id="shadowPad" min="0" max="32" value="8" />
+          </div>
+
+          <div class="row gap">
+            <label class="mini grow">cor</label>
+            <input type="color" id="shadowColor" value="#000000" />
+          </div>
+
+          <div class="row gap">
+            <label class="mini grow">opacidade <b id="shadowOpacityVal">45%</b></label>
+            <input type="range" id="shadowOpacity" min="5" max="100" value="45" />
+          </div>
+        </section>
+      </aside>
+
+      <section class="col stage">
+        <div class="stage-head">
+          <div class="stage-title">
+            <span id="shadowDims">—</span>
+            <span class="stage-sub" id="shadowInfo"></span>
+          </div>
+          <div class="stage-tools">
+            <button class="btn icon" id="shadowZoomOut" type="button">−</button>
+            <span class="zoom-label" id="shadowZoomLabel">1×</span>
+            <button class="btn icon" id="shadowZoomIn" type="button">+</button>
+            <button class="btn ghost sm" id="shadowFit" type="button">ajustar</button>
+          </div>
+        </div>
+
+        <div class="stage-body" id="shadowBody">
+          <div class="canvas-wrap" id="shadowWrap">
+            <div class="checker"></div>
+            <canvas id="shadowCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="stage-foot">
+          <span>a sombra fica atrás do sprite · apoia o personagem no chão</span>
+          <span id="shadowFoot"></span>
+        </div>
+      </section>
+
+      <aside class="col right">
+        <section class="panel">
+          <h2>Exportar</h2>
+          <button class="btn primary block" id="shadowExportComposite" type="button" disabled>PNG com sombra</button>
+          <div class="export-grid">
+            <button class="btn ghost" id="shadowExportOnly" type="button" disabled>PNG só sombra</button>
+            <button class="btn ghost" id="shadowExportAseprite" type="button" disabled>Aseprite</button>
+          </div>
+          <p class="export-note">
+            A sombra usa <b>alfa parcial</b> (tRNS), então ela se mistura com o chão no jogo.
+            O sprite continua com alfa binário.
+          </p>
+        </section>
+      </aside>
+
+    </div>
+  </section>
+
+</main>
+
+<div class="save-bar hidden" id="saveBar">
+  <span class="sb-text" id="saveBarText">arquivo pronto</span>
+  <a class="sb-link" id="saveBarLink" download>baixar</a>
+  <button class="sb-close" id="saveBarClose" type="button" aria-label="fechar">×</button>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="src/core.js"></script>
+<script src="src/aseprite.js"></script>
+<script src="src/profiles.js"></script>
+<script src="src/score.js"></script>
+<script src="src/sheet.js"></script>
+<script src="src/shadow.js"></script>
+<script src="src/library.js"></script>
+<script src="src/tabs.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
