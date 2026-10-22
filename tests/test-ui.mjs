@@ -537,14 +537,16 @@ ok(/falha de gravação/.test(g('libTotal').textContent), 'biblioteca não afirm
 testStore.putMeta = originalPutMeta;
 
 console.log('\n== 15. relevo, normais, iluminação e backup ==');
-async function exportAndWait(action) {
+async function exportAndWait(action, filename) {
   const before = savedBlobs.length;
   action();
   const deadline = Date.now() + 5000;
-  while (savedBlobs.length === before && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
-  if (savedBlobs.length === before) throw new Error('exportação não gerou arquivo: ' + g('toast').textContent);
+  while ((savedBlobs.length === before || (filename && !filename.test(g('saveBarText').textContent))) && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+  if (savedBlobs.length === before || (filename && !filename.test(g('saveBarText').textContent))) throw new Error('exportação não gerou o arquivo esperado: ' + g('saveBarText').textContent);
+  const blob = savedBlobs.at(-1);
   // O feedback de sucesso roda depois da entrega do blob, na mesma cadeia de promessas.
   await new Promise(r => setTimeout(r, 0));
+  return blob;
 }
 PF.tabs.switchTab('lighting');
 ok(!g('tab-lighting').classList.contains('hidden') && g('tab-shadow').classList.contains('hidden'), 'nova aba alterna sem sobrepor as outras');
@@ -561,9 +563,9 @@ await new Promise(r => setTimeout(r, 80));
 ok(g('lightInfo').textContent === 'normal map', 'visualização de normais funciona');
 ok(PF.lightingTab.settings().strength === 3.5 && PF.lightingTab.settings().flipY, 'controles atualizam força e convenção Y');
 for (const kind of ['Normal', 'Bump', 'Source', 'Lit']) {
-  await exportAndWait(() => g('lightExport' + kind).dispatch('click'));
-  const bytes = new Uint8Array(await savedBlobs.at(-1).arrayBuffer());
-  ok(bytes[25] === 6 && /exportado/.test(g('toast').textContent), 'export ' + kind + ' produz PNG RGBA');
+  const blob = await exportAndWait(() => g('lightExport' + kind).dispatch('click'), new RegExp('-' + kind.toLowerCase()));
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  ok(bytes[25] === 6, 'export ' + kind + ' produz PNG RGBA', 'colorType=' + bytes[25]);
 }
 const lightBackup = await saveBackup();
 ok(lightBackup.lighting.strength === 3.5 && lightBackup.lighting.flipY, 'backup inclui receita de relevo e luz');
@@ -589,8 +591,8 @@ ok(JSON.stringify(lightItem.result.asset) === sourceAssetBefore, 'geração e il
 console.log('\n== 16. segunda auditoria: exportação, editor e folhas ==');
 g('profiles').children.find(b => b.dataset.id === 'character').dispatch('click');
 g('sizeCustom').dispatch('input', { target: { value: '48' } });
-await exportAndWait(() => g('exportPng').dispatch('click'));
-let immediatePng = new DataView(await savedBlobs.at(-1).arrayBuffer());
+const immediateBlob = await exportAndWait(() => g('exportPng').dispatch('click'), /48x48px\.png/);
+let immediatePng = new DataView(await immediateBlob.arrayBuffer());
 ok(immediatePng.getUint32(16) === 48, 'exportação imediata aguarda a última alteração de tamanho');
 await saveBackup();
 g('sizeCustom').dispatch('input', { target: { value: '24' } });
@@ -612,7 +614,7 @@ await openBackup(onlyEditor);
 ok(PF.tabs.state().items.length === 0 && g('stageDims').textContent === '24×24', 'projeto sem biblioteca restaura o sprite em edição');
 ok((await testStore.getMeta('editor')).params.sizeW === 24, 'editor importado fica disponível após reabrir o navegador');
 PF.tabs.switchTab('lighting');
-await exportAndWait(() => g('lightExportNormal').dispatch('click'));
+await exportAndWait(() => g('lightExportNormal').dispatch('click'), /normal-y/);
 ok(!g('lightExportNormal').disabled && /normal-y/.test(g('saveBarText').textContent), 'normal map volta a funcionar ao abrir backup só do editor');
 ok(!/Sprite-em-edi/.test(g('saveBarText').textContent), 'nome exportado usa o nome do arquivo, sem texto do seletor');
 g('lightPresetBold').dispatch('click');
@@ -624,15 +626,15 @@ ok(PF.lightingTab.settings().strength === 6 && PF.lightingTab.settings().assetId
 g('lightColor').dispatch('input', { target: { value: '#ff0000' } });
 ok(PF.lightingTab.settings().color === '#ff0000', 'cor da luz atualiza durante a edição');
 g('sizeCustom').dispatch('input', { target: { value: '40' } });
-await exportAndWait(() => g('lightExportNormal').dispatch('click'));
-immediatePng = new DataView(await savedBlobs.at(-1).arrayBuffer());
+const immediateNormal = await exportAndWait(() => g('lightExportNormal').dispatch('click'), /normal-y/);
+immediatePng = new DataView(await immediateNormal.arrayBuffer());
 ok(immediatePng.getUint32(16) === 40, 'normal map também respeita edição pendente do sprite');
 g('outlineInner').dispatch('change', { target: { checked: true } });
 g('killBW').dispatch('change', { target: { checked: true } });
 g('killBWTol').dispatch('input', { target: { value: '15' } });
 g('silhouette').dispatch('change', { target: { value: 'white' } });
-await exportAndWait(() => g('exportJson').dispatch('click'));
-const manifest = JSON.parse(await savedBlobs.at(-1).text());
+const manifestBlob = await exportAndWait(() => g('exportJson').dispatch('click'), /\.asset\.json/);
+const manifest = JSON.parse(await manifestBlob.text());
 ok(manifest.params.outlineInner && manifest.params.removeBW && manifest.params.bwTolerance === 15 && manifest.params.silhouette === 'white' &&
   manifest.params.palette.length > 0 && Array.isArray(manifest.paletteRGBA) && Number.isInteger(manifest.transparentIndex), 'manifesto registra todos os controles novos do pipeline');
 const savedEditor = await saveBackup();
