@@ -12,13 +12,14 @@
   <div class="brand">
     <span class="mark" aria-hidden="true"></span>
     <span class="name">PIXEL FORGE</span>
-    <span class="tag">v1.4 · local</span>
+    <span class="tag">v1.5 · local</span>
   </div>
   <nav class="tabs" id="tabs">
     <button class="tab-btn active" data-tab="sprite" type="button">Sprite</button>
     <button class="tab-btn" data-tab="library" type="button">Biblioteca <span class="tab-count" id="libCount">0</span></button>
     <button class="tab-btn" data-tab="sheet" type="button">Folha</button>
     <button class="tab-btn" data-tab="shadow" type="button">Sombra</button>
+    <button class="tab-btn" data-tab="lighting" type="button">Relevo e luz</button>
   </nav>
   <div class="topbar-hint">Arraste uma imagem, cole com <kbd>Ctrl</kbd>+<kbd>V</kbd>, ou use um exemplo</div>
 </header>
@@ -581,6 +582,78 @@
     </div>
   </section>
 
+  <section class="tab-panel hidden" id="tab-lighting">
+    <div class="layout">
+      <aside class="col left">
+        <section class="panel">
+          <h2>Origem</h2>
+          <label class="field"><span>Sprite</span><select id="lightAsset"></select></label>
+          <p class="export-note" id="lightEmpty">Abra uma imagem na aba Sprite ou salve um asset na Biblioteca.</p>
+        </section>
+        <section class="panel">
+          <h2>Relevo · bump mapping</h2>
+          <label class="field"><span>Construir a altura</span><select id="lightMode">
+            <option value="silhouette">volume pela silhueta</option>
+            <option value="luminance">luminosidade da imagem</option>
+          </select></label>
+          <p class="export-note">Silhueta cria volume mesmo com cores chapadas. Luminosidade interpreta claro como alto e escuro como baixo.</p>
+          <label class="light-control" id="lightDetailRow"><span>Detalhes da cor <b id="lightDetailVal">0%</b></span><input id="lightDetail" type="range" min="0" max="100" value="0" /></label>
+          <label class="light-control"><span>Força do relevo <b id="lightStrengthVal">6</b></span><input id="lightStrength" type="range" min="0" max="20" step="0.5" value="6" /></label>
+          <label class="light-control"><span>Suavizar <b id="lightSmoothVal">1</b> px</span><input id="lightSmooth" type="range" min="0" max="4" value="1" /></label>
+          <label class="check"><input id="lightInvert" type="checkbox" /> inverter altura (cavado)</label>
+          <label class="check"><input id="lightFlipY" type="checkbox" /> inverter verde (Y− / DirectX)</label>
+          <p class="export-note">Padrão Y+ / OpenGL. A inversão de verde adapta o normal map ao motor e não muda a prévia.</p>
+        </section>
+        <section class="panel">
+          <h2>Luz de teste</h2>
+          <label class="light-control"><span>Direção <b id="lightAzimuthVal">135°</b></span><input id="lightAzimuth" type="range" min="0" max="360" value="135" /></label>
+          <label class="light-control"><span>Elevação <b id="lightElevationVal">45°</b></span><input id="lightElevation" type="range" min="5" max="90" value="45" /></label>
+          <label class="light-control"><span>Luz ambiente <b id="lightAmbientVal">35%</b></span><input id="lightAmbient" type="range" min="0" max="100" value="35" /></label>
+          <label class="light-control"><span>Intensidade <b id="lightIntensityVal">90%</b></span><input id="lightIntensity" type="range" min="0" max="200" value="90" /></label>
+          <label class="light-control"><span>Brilho da superfície <b id="lightSpecularVal">15%</b></span><input id="lightSpecular" type="range" min="0" max="100" value="15" /></label>
+          <label class="field"><span>Cor da luz</span><input id="lightColor" type="color" value="#fff1d6" /></label>
+          <label class="check"><input id="lightSelfShadow" type="checkbox" checked /> autossombra no relevo (prévia)</label>
+        </section>
+      </aside>
+      <section class="col stage">
+        <div class="stage-head">
+          <div class="stage-title"><span id="lightDims">—</span><span class="stage-sub" id="lightInfo"></span></div>
+          <div class="stage-tools">
+            <button class="btn icon" id="lightZoomOut" type="button" aria-label="Diminuir zoom do relevo">−</button>
+            <span class="zoom-label" id="lightZoomLabel">1×</span>
+            <button class="btn icon" id="lightZoomIn" type="button" aria-label="Aumentar zoom do relevo">+</button>
+            <button class="btn ghost sm" id="lightFit" type="button">ajustar</button>
+          </div>
+        </div>
+        <div class="light-view-bar"><label for="lightView">Visualizar</label><select id="lightView">
+          <option value="lit">sprite com luz</option><option value="source">cor original</option>
+          <option value="height">bump · mapa de altura</option><option value="normal">normal map</option>
+        </select></div>
+        <div class="stage-body" id="lightBody"><div class="canvas-wrap light-wrap"><div class="checker"></div><canvas id="lightCanvas" aria-label="Prévia de relevo e iluminação"></canvas></div></div>
+        <div class="stage-foot"><span>clique e arraste no sprite para mover a luz</span><span id="lightFoot"></span></div>
+      </section>
+      <aside class="col right">
+        <section class="panel">
+          <h2>Mapas para o jogo</h2>
+          <button class="btn primary block" id="lightExportNormal" type="button" disabled>PNG normal map</button>
+          <button class="btn ghost block" id="lightExportBump" type="button" disabled>PNG bump / altura</button>
+          <button class="btn ghost block" id="lightExportSource" type="button" disabled>PNG cor base</button>
+          <p class="export-note">Mesmo tamanho e transparência do sprite. Os mapas usam PNG RGBA, sem reduzir as cores dos vetores.</p>
+        </section>
+        <section class="panel">
+          <h2>Prévia pronta</h2>
+          <button class="btn ghost block" id="lightExportLit" type="button" disabled>PNG com a luz atual</button>
+          <p class="export-note">Essa opção grava a iluminação na imagem. Para luz dinâmica no jogo, use cor base + normal map.</p>
+        </section>
+        <section class="panel">
+          <h2>Como usar</h2>
+          <p class="export-note">Comece com cores chapadas. O mapa cria um relevo estimado; não remove sombras já pintadas na arte.</p>
+          <p class="export-note">No Godot: Sprite2D → CanvasTexture → Diffuse com a cor base e Normal Map com o mapa gerado. Adicione uma Light2D e use filtro nearest.</p>
+          <p class="export-note">A autossombra exibida aqui é uma simulação de altura. Sombras projetadas no cenário dependem do motor do jogo.</p>
+        </section>
+      </aside>
+    </div>
+  </section>
 </main>
 
 <div class="save-bar hidden" id="saveBar">
@@ -597,6 +670,8 @@
 <script src="src/score.js"></script>
 <script src="src/sheet.js"></script>
 <script src="src/shadow.js"></script>
+<script src="src/lighting.js"></script>
+<script src="src/lighting-tab.js"></script>
 <script src="src/library.js"></script>
 <script src="src/tabs.js"></script>
 <script src="src/app.js"></script>

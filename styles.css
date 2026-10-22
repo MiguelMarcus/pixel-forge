@@ -870,6 +870,21 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---------------------------------------------------------------- responsivo */
 
+.light-control { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; font-size: 11px; color: var(--muted); }
+.light-control span { display: flex; justify-content: space-between; gap: 8px; }
+.light-control b { color: var(--accent); font-family: var(--mono); font-weight: normal; }
+.light-control input { width: 100%; }
+.light-view-bar { padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.light-view-bar select { flex: 1; max-width: 240px; }
+.light-wrap { flex: none; }
+#lightCanvas { display: block; position: relative; image-rendering: pixelated; cursor: crosshair; touch-action: none; }
+#tab-lighting .check { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); margin: 10px 0; }
+
+@media (min-width: 861px) and (max-width: 1180px) {
+  #tab-lighting .layout { grid-template-columns: 240px minmax(0, 1fr) 260px; }
+  #tab-lighting .right { position: static; width: auto; }
+}
+
 @media (max-width: 1180px) {
   .layout { grid-template-columns: 280px minmax(0, 1fr); }
   .right {

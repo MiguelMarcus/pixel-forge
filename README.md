@@ -140,12 +140,13 @@ na base sai errado — o sprite flutua. Foi exatamente o que o teste de perfil p
 
 ## Biblioteca e folha
 
-Quatro abas, um verbo cada:
+Cinco abas:
 
 - **Sprite** — conforma um asset contra o contrato do perfil.
 - **Biblioteca** — o acervo do projeto.
 - **Folha** — monta o conjunto e valida o conjunto.
 - **Sombra** — projeta sombra automática nos sprites.
+- **Relevo e luz** — gera bump e normal map, com iluminação de teste.
 
 ### A biblioteca guarda a receita, não o bolo
 
@@ -198,6 +199,40 @@ do personagem) e **.aseprite** do composto.
 A sombra é o único asset com **alfa parcial** neste app — ela precisa se misturar com o chão. Sai
 como PNG indexado com `tRNS` de alfa variável; o sprite continua com alfa binário e o contrato
 dele não muda.
+
+---
+
+## Relevo e luz · bump e normal map
+
+Use o sprite atual do editor ou um asset da Biblioteca. A nova aba gera mapas separados,
+sem alterar a receita, a paleta ou as cores originais do sprite:
+
+- **Volume pela silhueta** estima uma superfície arredondada pela distância até a borda.
+  Funciona com cores chapadas; “detalhes da cor” mistura a luminosidade à altura estimada.
+- **Luminosidade da imagem** usa claro como alto e escuro como baixo. Pode interpretar
+  uma cor escura como cavidade, então use esse modo quando isso representar o material.
+- **Força, suavização e inversão** controlam o relevo e as normais. O padrão exporta Y+
+  (OpenGL); a opção de inverter verde exporta Y− (DirectX). A prévia não muda ao trocar
+  essa convenção: ela representa a mesma superfície.
+- **Luz de teste** tem direção, elevação, ambiente, intensidade, cor e brilho especular.
+  Clique e arraste na prévia para mudar a direção. A autossombra faz uma busca limitada
+  no mapa de altura; é uma aproximação da superfície, não uma simulação completa do cenário.
+
+Exporte **PNG normal map**, **PNG bump / altura** e **PNG cor base** para usar no motor.
+Os arquivos mantêm dimensões e alpha e usam PNG RGBA de 8 bits por canal, sem paleta
+reduzida: quantizar as cores do normal map distorceria as direções. A força controla as
+normais e a prévia; o bump guarda a altura normalizada, para ajustar a escala no motor.
+**PNG com a luz atual** grava a prévia iluminada, caso queira um bitmap já pronto.
+
+No Godot, use um `CanvasTexture` com a cor base em Diffuse e o mapa em Normal Map,
+uma `Light2D` e filtro nearest. Veja a
+[documentação de iluminação 2D](https://docs.godotengine.org/en/stable/tutorials/2d/2d_lights_and_shadows.html).
+Outros motores precisam de um material ou shader que leia normal maps em sprites.
+
+Os controles de relevo e luz são persistidos no navegador e no `.pfset`; backups anteriores
+continuam abrindo com os padrões da nova aba. A cor base deve preferencialmente ter cores
+chapadas: o algoritmo estima o relevo e não remove iluminação já pintada na imagem.
+Sombras projetadas nos outros objetos dependem do sistema de luz do motor.
 
 ---
 
@@ -297,8 +332,9 @@ arquivo gerado, ele lê um `.aseprite` salvo pelo próprio Aseprite
 iguais. Se o parser entende o arquivo do Aseprite, o entendimento do container está certo;
 depois disso, comparar o gerado com o PNG exportado é verificação real.
 
-Estado atual: **104/104** no core, **88/88** na UI, **11/11** cenários de regressão,
-**25/25** na verificação do PNG e **18/18** na do `.aseprite`.
+Estado atual: **104/104** no core, **107/107** na UI, **11/11** cenários de regressão,
+**9/9** cenários de relevo/iluminação, **25/25** na verificação do PNG indexado,
+**18/18** na do `.aseprite` e **3/3** arquivos RGBA verificados com Pillow.
 
 `npm test` executa núcleo, UI e regressões com Node 22 ou superior. Para os verificadores
 independentes, instale Pillow (`python -m pip install Pillow`) e rode `npm run test:formats`
@@ -345,6 +381,8 @@ pixel-forge/
   src/score.js        score contra a âncora (paleta, valor, linha, silhueta)
   src/sheet.js        composição e validação de folha
   src/shadow.js       sombra automática (elipse e silhueta achatada)
+  src/lighting.js     altura, normais, iluminação e autossombra no relevo
+  src/lighting-tab.js interface da aba Relevo e luz
   src/library.js      armazenamento (IndexedDB/memória) e arquivo .pfset
   src/tabs.js         UI das abas Biblioteca e Folha
   src/app.js          aba Sprite e shell

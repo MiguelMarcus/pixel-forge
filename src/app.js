@@ -380,6 +380,7 @@
     renderSwatches(result.asset);
     applyZoom();
     updateExportEnabled();
+    if (PF.lightingTab) PF.lightingTab.render();
   }
 
   /* ---------------------------------------------------------------- render */
@@ -1527,6 +1528,7 @@
       saveBytes: saveBytes,
       loadIntoEditor: loadItem,
       getProfile: function () { return state.profile; },
+      getEditor: function () { return state.result ? { asset: state.result.asset, name: safeName() } : null; },
       getContract: function () { return state.contract; },
       restoreProject: restoreProject
     });

@@ -162,6 +162,7 @@
       sheet: state.sheet,
       anchorId: state.anchorId || null,
       shadow: state.shadow || null,
+      lighting: state.lighting || null,
       items: (state.items || []).map(function (it) {
         return {
           id: it.id,
@@ -212,6 +213,7 @@
         })) throw new Error('layout da folha inválido');
     }
     if (data.anchorId && !ids.has(data.anchorId)) throw new Error('âncora não encontrada');
+    if (data.lighting != null && (typeof data.lighting !== 'object' || Array.isArray(data.lighting))) throw new Error('configuração de relevo inválida');
     if (data.shadow) {
       var sh = data.shadow;
       if (['ellipse', 'silhouette'].indexOf(sh.shape) === -1 || !PF.hexToRgb(sh.color) ||

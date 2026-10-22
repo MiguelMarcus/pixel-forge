@@ -175,7 +175,7 @@
   /* ---------------------------------------------------------------- abas */
 
   function switchTab(name) {
-    ['sprite', 'library', 'sheet', 'shadow'].forEach(function (t) {
+    ['sprite', 'library', 'sheet', 'shadow', 'lighting'].forEach(function (t) {
       var el = $('tab-' + t);
       if (el) el.classList.toggle('hidden', t !== name);
     });
@@ -187,6 +187,7 @@
       validateNow();
     }
     if (name === 'shadow') renderShadowTab();
+    if (name === 'lighting') PF.lightingTab.render();
   }
 
   /* ---------------------------------------------------------------- biblioteca */
@@ -638,6 +639,7 @@
     renderSheetAssets();
     renderSheet();
     renderShadowTab();
+    PF.lightingTab.render();
     validateNow();
     scheduleValidate();
   }
@@ -1079,6 +1081,9 @@
       });
       return chain;
     }).then(function () {
+      return deps.store.getMeta('lighting');
+    }).then(function (savedLighting) {
+      PF.lightingTab.restore(savedLighting);
       return deps.store.getMeta('project');
     }).then(function (settings) {
       if (settings && deps.restoreProject) deps.restoreProject(settings);
@@ -1157,6 +1162,7 @@
         sheet: sheet,
         anchorId: anchorId,
         shadow: shadow,
+        lighting: PF.lightingTab.settings(),
         items: items.map(function (it) {
           return {
             id: it.id, name: it.name, profile: it.profile,
@@ -1290,6 +1296,7 @@
     var incoming = [];
     var incomingSheet = clone(data.sheet || { mode: 'grid', width: 512, height: 512, cell: 32, baseline: 480, snap: true, placements: [] });
     var incomingShadow = clone(data.shadow || { assetId: null, shape: 'ellipse', widthScale: 1, squash: 0.35, offsetX: 0, offsetY: 0, color: '#000000', opacity: 45, pad: 8 });
+    var incomingLighting = PF.lighting.settings(data.lighting);
     var settings = { profile: data.profile, contract: clone(data.contract) };
     var chain = Promise.resolve();
     (data.items || []).forEach(function (rec) {
@@ -1318,7 +1325,7 @@
       return Promise.all(pendingWrites.slice());
     }).then(function () {
       return deps.store.replace(incoming.map(serialize), {
-        sheet: incomingSheet, shadow: incomingShadow, anchor: data.anchorId || null, project: settings
+        sheet: incomingSheet, shadow: incomingShadow, lighting: incomingLighting, anchor: data.anchorId || null, project: settings
       });
     }).then(function () {
       items = incoming;
@@ -1330,6 +1337,7 @@
       drag = null;
       storageFailed = false;
       if (deps.restoreProject) deps.restoreProject(settings);
+      PF.lightingTab.restore(incomingLighting);
       applySheetControls();
       applyShadowControls();
       dirty = false;
@@ -1345,6 +1353,17 @@
 
   function init(d) {
     deps = d;
+    PF.lightingTab.init({
+      getItems: function () { return items; },
+      getEditor: deps.getEditor,
+      toast: toast,
+      saveBytes: deps.saveBytes,
+      changed: function (value) {
+        dirty = true;
+        persist(deps.store.putMeta('lighting', clone(value)));
+        renderLibrary();
+      }
+    });
     bind();
     bindSheet();
     bindShadow();

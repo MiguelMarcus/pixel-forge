@@ -18,10 +18,12 @@ require('../src/profiles.js');
 require('../src/score.js');
 require('../src/sheet.js');
 require('../src/shadow.js');
+require('../src/lighting.js');
 require('../src/library.js');
 
 globalThis.self = globalThis;
 globalThis.PF = PF;
+require('../src/lighting-tab.js');
 require('../src/tabs.js');
 
 const HERE = import.meta.dirname;
@@ -38,7 +40,8 @@ function ok(cond, label, extra) {
 console.log('\n== 1. ids referenciados vs. ids no HTML ==');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const appjs = fs.readFileSync(path.join(ROOT, 'src', 'app.js'), 'utf8') +
-  fs.readFileSync(path.join(ROOT, 'src', 'tabs.js'), 'utf8');
+  fs.readFileSync(path.join(ROOT, 'src', 'tabs.js'), 'utf8') +
+  fs.readFileSync(path.join(ROOT, 'src', 'lighting-tab.js'), 'utf8');
 
 const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
 const usedIds = new Set([...appjs.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]));
@@ -532,6 +535,48 @@ await new Promise(r => setTimeout(r, 20));
 ok(/Falha ao gravar/.test(g('toast').textContent), 'erro de gravação de metadados é visível');
 ok(/falha de gravação/.test(g('libTotal').textContent), 'biblioteca não afirma que tudo foi salvo');
 testStore.putMeta = originalPutMeta;
+
+console.log('\n== 15. relevo, normais, iluminação e backup ==');
+PF.tabs.switchTab('lighting');
+ok(!g('tab-lighting').classList.contains('hidden') && g('tab-shadow').classList.contains('hidden'), 'nova aba alterna sem sobrepor as outras');
+ok(g('lightAsset').children.some(option => option.value === 'editor'), 'sprite atual pode ser usado sem salvar na biblioteca');
+const lightItem = PF.tabs.state().items[0];
+g('lightAsset').dispatch('change', { target: { value: lightItem.id } });
+await new Promise(r => setTimeout(r, 80));
+ok(g('lightDims').textContent === lightItem.result.asset.width + '×' + lightItem.result.asset.height, 'mapas usam a resolução exata do sprite escolhido');
+ok(g('lightCanvas').width > 1 && !g('lightExportNormal').disabled, 'preview e exportação de normal map habilitados');
+g('lightStrength').dispatch('input', { target: { value: '3.5' } });
+g('lightFlipY').dispatch('change', { target: { checked: true } });
+g('lightView').dispatch('change', { target: { value: 'normal' } });
+await new Promise(r => setTimeout(r, 80));
+ok(g('lightInfo').textContent === 'normal map', 'visualização de normais funciona');
+ok(PF.lightingTab.settings().strength === 3.5 && PF.lightingTab.settings().flipY, 'controles atualizam força e convenção Y');
+for (const kind of ['Normal', 'Bump', 'Source', 'Lit']) {
+  g('lightExport' + kind).dispatch('click');
+  await new Promise(r => setTimeout(r, 100));
+  const bytes = new Uint8Array(await savedBlobs.at(-1).arrayBuffer());
+  ok(bytes[25] === 6 && /exportado/.test(g('toast').textContent), 'export ' + kind + ' produz PNG RGBA');
+}
+const lightBackup = await saveBackup();
+ok(lightBackup.lighting.strength === 3.5 && lightBackup.lighting.flipY, 'backup inclui receita de relevo e luz');
+ok(!closeWarns(), 'salvar backup limpa alterações de iluminação');
+PF.tabs.switchTab('lighting');
+ok(!closeWarns(), 'abrir a aba de iluminação não altera o projeto');
+g('lightStrength').dispatch('input', { target: { value: '12' } });
+ok(closeWarns(), 'mudança de relevo marca backup pendente');
+await openBackup(lightBackup);
+ok(PF.lightingTab.settings().strength === 3.5 && g('lightFlipY').checked, 'importação restaura controles e receita');
+ok((await testStore.getMeta('lighting')).strength === 3.5, 'receita de relevo é persistida junto ao projeto');
+g('lightView').dispatch('change', { target: { value: 'lit' } });
+g('lightCanvas').dispatch('pointerdown', { button: 0, clientX: 700, clientY: 300, pointerId: 4 });
+g('lightCanvas').dispatch('pointerup');
+await new Promise(r => setTimeout(r, 80));
+ok(PF.lightingTab.settings().azimuth === 0, 'arrastar na prévia move a direção da luz');
+const sourceAssetBefore = JSON.stringify(lightItem.result.asset);
+g('lightMode').dispatch('change', { target: { value: 'luminance' } });
+await new Promise(r => setTimeout(r, 80));
+ok(g('lightDetailRow').classList.contains('hidden'), 'modo luminosidade oculta mistura de silhueta');
+ok(JSON.stringify(lightItem.result.asset) === sourceAssetBefore, 'geração e iluminação preservam o sprite original');
 g('saveBarClose').dispatch('click');
 console.log('\n----------------------------------------');
 console.log(passes + ' passaram, ' + failures + ' falharam');

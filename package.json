@@ -1,12 +1,12 @@
 {
   "name": "pixel-forge",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "description": "Conformador local de assets 2D e pixel art",
   "engines": { "node": ">=22" },
   "scripts": {
-    "test": "node tests/test-core.mjs && node tests/test-ui.mjs && node --test tests/test-regressions.cjs",
-    "test:formats": "python tests/verify_png.py && python tests/verify_aseprite.py",
+    "test": "node tests/test-core.mjs && node tests/test-ui.mjs && node --test tests/test-regressions.cjs tests/test-lighting.cjs",
+    "test:formats": "python tests/verify_png.py && python tests/verify_aseprite.py && python tests/verify_lighting.py",
     "build": "node tools/build-site.mjs"
   }
 }

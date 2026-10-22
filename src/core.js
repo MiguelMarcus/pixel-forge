@@ -1486,6 +1486,27 @@
     });
   }
 
+  // Mapas de dados precisam de RGB completo: quantizar normais distorce vetores.
+  function encodeRGBAPNG(img, opts) {
+    opts = opts || {};
+    var w = img.width, h = img.height;
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || img.data.length !== w * h * 4) {
+      return Promise.reject(new Error('imagem RGBA inválida'));
+    }
+    var ihdr = new Uint8Array(13);
+    ihdr.set(u32(w), 0); ihdr.set(u32(h), 4);
+    ihdr[8] = 8; ihdr[9] = 6;
+    var raw = new Uint8Array((w * 4 + 1) * h);
+    for (var y = 0; y < h; y++) raw.set(img.data.subarray(y * w * 4, (y + 1) * w * 4), y * (w * 4 + 1) + 1);
+    return Promise.resolve((opts.deflate || defaultDeflate)(raw)).then(function (z) {
+      var parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+        chunk('IHDR', ihdr), chunk('IDAT', z), chunk('IEND', new Uint8Array(0))];
+      var out = new Uint8Array(parts.reduce(function (n, part) { return n + part.length; }, 0)), offset = 0;
+      parts.forEach(function (part) { out.set(part, offset); offset += part.length; });
+      return out;
+    });
+  }
+
   function scaleNearest(asset, factor) {
     var w = asset.width * factor, h = asset.height * factor;
     var out = new Uint8Array(w * h);
@@ -1526,7 +1547,7 @@
   }
 
   return {
-    VERSION: '1.4.1',
+    VERSION: '1.5.0',
     PALETTE_DEFS: PALETTE_DEFS,
     palettes: resolvedPalettes,
     hexToRgb: hexToRgb,
@@ -1556,6 +1577,7 @@
     extractSpread: extractSpread,
     sortPaletteRamps: sortPaletteRamps,
     encodePNG: encodePNG,
+    encodeRGBAPNG: encodeRGBAPNG,
     zlibDeflate: defaultDeflate,
     deflateStored: deflateStored,
     scaleNearest: scaleNearest,
