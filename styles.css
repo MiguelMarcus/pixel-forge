@@ -399,8 +399,8 @@ input[type="range"]::-moz-range-thumb {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   overflow: auto;
   padding: 22px;
   position: relative;
@@ -432,6 +432,7 @@ input[type="range"]::-moz-range-thumb {
 .compare { display: flex; align-items: center; justify-content: center; }
 
 .canvas-wrap {
+  margin: auto;
   position: relative;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px #2c3242;
   flex: none;
@@ -814,7 +815,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---------------------------------------------------------------- folha */
 
-.sheet-wrap { position: relative; flex: none; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px #2c3242; }
+.sheet-wrap { margin: auto; position: relative; flex: none; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px #2c3242; }
 
 #sheetCanvas { position: relative; display: block; image-rendering: pixelated; cursor: crosshair; }
 
@@ -886,11 +887,11 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @media (max-width: 1180px) {
-  .layout { grid-template-columns: 280px minmax(0, 1fr); }
+  .topbar-hint { display: none; }
+  .layout { grid-template-columns: 240px minmax(0, 1fr) 260px; }
   .right {
-    position: fixed;
-    right: 0; top: 52px; bottom: 0;
-    width: 320px;
+    position: static;
+    width: auto;
     background: var(--bg);
     border-left: 1px solid var(--line);
     z-index: 20;
@@ -899,9 +900,14 @@ input[type="range"]::-moz-range-thumb {
 
 @media (max-width: 860px) {
   body { overflow: auto; }
+  .topbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 10px; padding: 10px 14px; }
+  .brand { flex-shrink: 0; }
+  .tabs { order: 2; flex-basis: 100%; overflow-x: auto; }
+  .app-main, .tab-panel { height: auto; }
+  .tab-panel { overflow: visible; }
   .layout { display: block; height: auto; }
   .left { border-right: 0; border-bottom: 1px solid var(--line); }
   .right { position: static; width: auto; border-left: 0; border-top: 1px solid var(--line); }
-  .stage { height: 60vh; }
+  .stage { height: 60vh; min-height: 340px; }
   .topbar-hint { display: none; }
 }

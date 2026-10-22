@@ -43,6 +43,22 @@
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+  function markDirty() {
+    if (!deps) return;
+    dirty = true;
+    renderLibrary();
+  }
+
+  function prepareEditor(record) {
+    if (!record) return Promise.resolve(null);
+    return decodeDataURL(record.source).then(function (image) {
+      var item = { name: record.name, profile: record.profile, params: record.params,
+        contract: record.contract, source: image, sourceDataUrl: record.source };
+      item.result = computeResult(item);
+      return item;
+    });
+  }
+
   function persist(promise) {
     var tracked = promise.catch(function (e) {
       storageFailed = true;
@@ -126,13 +142,18 @@
     return new Promise(function (resolve, reject) {
       var img = new Image();
       img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        var ctx = c.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        var d = ctx.getImageData(0, 0, c.width, c.height);
-        resolve({ width: c.width, height: c.height, data: d.data });
+        try {
+          if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > 16777216) {
+            throw new Error('imagem excede o limite de 16 megapixels ou 8192 px por lado');
+          }
+          var c = document.createElement('canvas');
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          var ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          var d = ctx.getImageData(0, 0, c.width, c.height);
+          resolve({ width: c.width, height: c.height, data: d.data });
+        } catch (e) { reject(e); }
       };
       img.onerror = reject;
       img.src = url;
@@ -382,6 +403,7 @@
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         var x = c * sheet.cell, y = r * sheet.cell;
+        if (x + w > sheet.width || y + h > sheet.height) continue;
         var free = true;
         for (var i = 0; i < sheet.placements.length; i++) {
           var p = sheet.placements[i];
@@ -393,15 +415,19 @@
         if (free) return { x: x, y: y };
       }
     }
-    return { x: 0, y: 0 };
+    return null;
   }
 
   function placeAsset(id) {
     var it = findItem(id);
     if (!it) return;
+    if (it.result.asset.width > sheet.width || it.result.asset.height > sheet.height) {
+      toast('O sprite é maior que a folha. Aumente a folha ou reconforme o asset.'); return;
+    }
     var pos;
     if (sheet.mode === 'grid') {
-      pos = firstFreeCell(sheet.cell, sheet.cell);
+      pos = firstFreeCell(it.result.asset.width, it.result.asset.height);
+      if (!pos) { toast('A folha está cheia. Aumente as dimensões ou remova um sprite.'); return; }
     } else {
       pos = {
         x: Math.round((sheet.width - it.result.asset.width) / 2),
@@ -1057,7 +1083,9 @@
   /* ---------------------------------------------------------------- persistência */
 
   function loadFromStore() {
-    deps.store.ready.then(function () { return deps.store.all(); }).then(function (records) {
+    projectLoading = true;
+    document.body.inert = true;
+    return deps.store.ready.then(function () { return deps.store.all(); }).then(function (records) {
       if (!records || !records.length) { renderAll(); return; }
       var chain = Promise.resolve();
       records.forEach(function (rec) {
@@ -1081,12 +1109,16 @@
       });
       return chain;
     }).then(function () {
-      return deps.store.getMeta('lighting');
-    }).then(function (savedLighting) {
-      PF.lightingTab.restore(savedLighting);
       return deps.store.getMeta('project');
     }).then(function (settings) {
       if (settings && deps.restoreProject) deps.restoreProject(settings);
+      return deps.store.getMeta('editor');
+    }).then(function (record) {
+      if (record) return prepareEditor(record).then(deps.restoreEditor);
+    }).then(function () {
+      return deps.store.getMeta('lighting');
+    }).then(function (savedLighting) {
+      PF.lightingTab.restore(savedLighting);
       return deps.store.getMeta('shadow');
     }).then(function (savedShadow) {
       if (savedShadow) {
@@ -1110,6 +1142,9 @@
       storageFailed = true;
       renderAll();
       toast('Falha ao carregar o acervo: ' + e.message);
+    }).finally(function () {
+      projectLoading = false;
+      document.body.inert = false;
     });
   }
 
@@ -1156,6 +1191,7 @@
     });
 
     $('libSaveFile').addEventListener('click', function () {
+      var editor = deps.getEditorSnapshot();
       var data = PF.library.toSetFile({
         profile: deps.getProfile(),
         contract: deps.getContract(),
@@ -1163,6 +1199,7 @@
         anchorId: anchorId,
         shadow: shadow,
         lighting: PF.lightingTab.settings(),
+        editor: editor,
         items: items.map(function (it) {
           return {
             id: it.id, name: it.name, profile: it.profile,
@@ -1297,6 +1334,7 @@
     var incomingSheet = clone(data.sheet || { mode: 'grid', width: 512, height: 512, cell: 32, baseline: 480, snap: true, placements: [] });
     var incomingShadow = clone(data.shadow || { assetId: null, shape: 'ellipse', widthScale: 1, squash: 0.35, offsetX: 0, offsetY: 0, color: '#000000', opacity: 45, pad: 8 });
     var incomingLighting = PF.lighting.settings(data.lighting);
+    var incomingEditor = null;
     var settings = { profile: data.profile, contract: clone(data.contract) };
     var chain = Promise.resolve();
     (data.items || []).forEach(function (rec) {
@@ -1319,13 +1357,16 @@
       });
     });
     return chain.then(function () {
+      return prepareEditor(data.editor).then(function (editor) { incomingEditor = editor; });
+    }).then(function () {
       // Nenhuma alteração no acervo anterior até todas as fontes serem válidas.
       clearTimeout(shadowSaveTimer);
       clearTimeout(pendingTimer);
       return Promise.all(pendingWrites.slice());
     }).then(function () {
       return deps.store.replace(incoming.map(serialize), {
-        sheet: incomingSheet, shadow: incomingShadow, lighting: incomingLighting, anchor: data.anchorId || null, project: settings
+        sheet: incomingSheet, shadow: incomingShadow, lighting: incomingLighting, editor: data.editor || null,
+        anchor: data.anchorId || null, project: settings
       });
     }).then(function () {
       items = incoming;
@@ -1337,6 +1378,8 @@
       drag = null;
       storageFailed = false;
       if (deps.restoreProject) deps.restoreProject(settings);
+      if (data.editor) deps.restoreEditor(incomingEditor);
+      else deps.restoreEditor(null);
       PF.lightingTab.restore(incomingLighting);
       applySheetControls();
       applyShadowControls();
@@ -1358,6 +1401,7 @@
       getEditor: deps.getEditor,
       toast: toast,
       saveBytes: deps.saveBytes,
+      flushEditor: deps.flushEditor,
       changed: function (value) {
         dirty = true;
         persist(deps.store.putMeta('lighting', clone(value)));
@@ -1369,7 +1413,7 @@
     bindShadow();
     applySheetControls();
     applyShadowControls();
-    loadFromStore();
+    return loadFromStore();
   }
 
   root.PF.tabs = {
@@ -1379,6 +1423,7 @@
     setAnchor: setAnchor,
     anchorId: function () { return anchorId; },
     render: function () { renderAll(); },
+    markDirty: markDirty,
     state: function () { return { items: items, sheet: sheet }; }
   };
 })(typeof self !== 'undefined' ? self : this);

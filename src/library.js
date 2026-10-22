@@ -43,6 +43,7 @@
   }
 
   function createStore() {
+    function copy(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
     var memory = new Map();
     var metaMem = new Map();
     var db = null;
@@ -72,7 +73,7 @@
 
     function all() {
       return read('items', function (store) {
-        return store ? store.getAll() : Array.from(memory.values());
+        return store ? store.getAll() : copy(Array.from(memory.values()));
       });
     }
 
@@ -100,6 +101,7 @@
     }
 
     function put(item) {
+      item = copy(item);
       return write(['items'], function (tx) {
         tx.objectStore('items').put(item);
       }, function () { memory.set(item.id, item); });
@@ -120,17 +122,20 @@
     function kind() { return kindName; }
 
     function putMeta(key, value) {
+      value = copy(value);
       return write(['meta'], function (tx) {
         tx.objectStore('meta').put(value, key);
       }, function () { metaMem.set(key, value); });
     }
 
     function getMeta(key) {
-      return read('meta', function (store) { return store ? store.get(key) : metaMem.get(key); });
+      return read('meta', function (store) { return store ? store.get(key) : copy(metaMem.get(key)); });
     }
 
     // Substitui itens e metadados juntos; um aborto preserva o projeto anterior.
     function replace(records, metadata) {
+      records = copy(records);
+      metadata = copy(metadata);
       return write(['items', 'meta'], function (tx) {
         var itemStore = tx.objectStore('items');
         var metaStore = tx.objectStore('meta');
@@ -163,6 +168,11 @@
       anchorId: state.anchorId || null,
       shadow: state.shadow || null,
       lighting: state.lighting || null,
+      editor: state.editor ? {
+        name: state.editor.name, profile: state.editor.profile,
+        params: state.editor.params, contract: state.editor.contract,
+        source: state.editor.sourceDataUrl
+      } : null,
       items: (state.items || []).map(function (it) {
         return {
           id: it.id,
@@ -192,18 +202,22 @@
     }
     if (!profileValid(data.profile) || !contractValid(data.contract)) throw new Error('perfil ou contrato inválido');
     var ids = new Set();
-    data.items.forEach(function (item, index) {
+    function validateRecipe(item, label, requireId) {
       var p = item && item.params;
-      if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id) ||
+      if (!item || (requireId && (typeof item.id !== 'string' || !item.id || ids.has(item.id))) ||
         !profileValid(item.profile) || !contractValid(item.contract) || !p ||
         !positiveInt(p.sizeW, 2048) || !positiveInt(p.sizeH, 2048) ||
         !Array.isArray(p.palette) || !p.palette.length || p.palette.length > 256 ||
         !p.palette.every(function (c) { return typeof c === 'string' && !!PF.hexToRgb(c); }) ||
         typeof item.source !== 'string' || !/^data:image\//i.test(item.source)) {
-        throw new Error('asset ' + (index + 1) + ' inválido');
+        throw new Error(label + ' inválido');
       }
+    }
+    data.items.forEach(function (item, index) {
+      validateRecipe(item, 'asset ' + (index + 1), true);
       ids.add(item.id);
     });
+    if (data.editor != null) validateRecipe(data.editor, 'sprite em edição', false);
     if (data.sheet) {
       var s = data.sheet;
       if (!positiveInt(s.width, 2048) || !positiveInt(s.height, 2048) || !positiveInt(s.cell, 256) ||

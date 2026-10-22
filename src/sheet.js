@@ -119,7 +119,7 @@
       ok: outside === 0, detail: outside ? outside + ' fora' : placements.length + ' sprites'
     });
 
-    if (mode === 'ruler') {
+    {
       var overlaps = 0;
       for (var a = 0; a < placements.length; a++) {
         for (var b = a + 1; b < placements.length; b++) {
@@ -135,15 +135,18 @@
     }
 
     if (mode === 'grid') {
-      var wrong = 0;
+      var wrong = 0, offGrid = 0;
       for (var c = 0; c < placements.length; c++) {
         var pl = placements[c];
         if (pl.asset.width !== o.cell || pl.asset.height !== o.cell) wrong++;
+        if (pl.x % o.cell !== 0 || pl.y % o.cell !== 0) offGrid++;
       }
       checks.push({
         id: 'cellFit', label: 'Todos no tamanho da célula',
         ok: wrong === 0, detail: wrong ? wrong + ' fora de ' + o.cell + 'px' : o.cell + '×' + o.cell
       });
+      checks.push({ id: 'gridAlignment', label: 'Alinhados à grade', ok: offGrid === 0,
+        detail: offGrid ? offGrid + ' fora da grade' : 'ok' });
     }
 
     var bottoms = [], heights = [];

@@ -7,14 +7,14 @@
     lightMode: ['mode', 'select'], lightDetail: ['detail', 100], lightStrength: ['strength', 1],
     lightSmooth: ['smooth', 1], lightInvert: ['invert', 'check'], lightFlipY: ['flipY', 'check'],
     lightAzimuth: ['azimuth', 1], lightElevation: ['elevation', 1], lightAmbient: ['ambient', 100],
-    lightIntensity: ['intensity', 100], lightSpecular: ['specular', 100], lightColor: ['color', 'select'],
+    lightIntensity: ['intensity', 100], lightSpecular: ['specular', 100], lightColor: ['color', 'color'],
     lightSelfShadow: ['selfShadow', 'check'], lightView: ['view', 'select']
   };
 
   function sources() {
     var list = deps.getItems().map(function (item) { return { id: item.id, name: item.name, asset: item.result.asset }; });
     var current = deps.getEditor();
-    if (current) list.unshift({ id: 'editor', name: 'Sprite em edição · ' + current.name, asset: current.asset });
+    if (current) list.unshift({ id: 'editor', name: current.name, label: 'Sprite em edição · ' + current.name, asset: current.asset });
     return list;
   }
 
@@ -72,7 +72,7 @@
     var list = sources(), select = $('lightAsset');
     select.innerHTML = '';
     list.forEach(function (item) {
-      var option = document.createElement('option'); option.value = item.id; option.textContent = item.name; select.appendChild(option);
+      var option = document.createElement('option'); option.value = item.id; option.textContent = item.label || item.name; select.appendChild(option);
     });
     if (!list.some(function (item) { return item.id === state.assetId; })) state.assetId = list.length ? list[0].id : 'editor';
     select.value = state.assetId;
@@ -82,6 +82,7 @@
       maps = null; cachedAsset = null;
       $('lightCanvas').width = $('lightCanvas').height = 1;
       $('lightDims').textContent = '—'; $('lightInfo').textContent = '';
+      $('lightFoot').textContent = '';
       return;
     }
     if (!$('tab-lighting').classList.contains('hidden')) draw();
@@ -104,12 +105,21 @@
   }
 
   function exportMap(kind) {
+    if (state.assetId === 'editor') {
+      deps.flushEditor();
+      if (!deps.getEditor()) { deps.toast('Corrija o sprite em edição antes de exportar o mapa.'); return; }
+    }
     var item = active();
     if (!item) { deps.toast('Abra um sprite ou salve um asset na biblioteca.'); return; }
-    var m = updateMaps(item);
-    var img = kind === 'normal' ? m.normal : (kind === 'bump' ? m.bump : (kind === 'source' ? m.source : PF.lighting.illuminate(m, state)));
+    var m, img;
+    try {
+      m = updateMaps(item);
+      img = kind === 'normal' ? m.normal : (kind === 'bump' ? m.bump : (kind === 'source' ? m.source : PF.lighting.illuminate(m, state)));
+    } catch (e) { deps.toast('Falha ao gerar o mapa: ' + e.message); return; }
     var suffix = kind === 'normal' ? 'normal-' + (state.flipY ? 'y-minus' : 'y-plus') : kind;
-    var name = String(item.name || 'sprite').replace(/[^\w-]+/g, '-') + '-' + suffix + '.png';
+    var stem = String(item.name || 'sprite').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'sprite';
+    var name = stem + '-' + suffix + '.png';
     return PF.encodeRGBAPNG(img).then(function (bytes) {
       return deps.saveBytes(bytes, name, 'image/png');
     }).then(function () { deps.toast('PNG ' + suffix + ' exportado.'); })
@@ -117,6 +127,7 @@
   }
 
   function restore(value) {
+    clearTimeout(timer); dragging = false;
     state = PF.lighting.settings(value); cachedAsset = null;
     syncControls(); render();
   }
@@ -131,6 +142,17 @@
       });
     });
     $('lightAsset').addEventListener('change', function (e) { state.assetId = e.target.value; changed(); });
+    var presets = {
+      lightPresetSoft: { strength: 4, smooth: 2, ambient: 0.45, specular: 0.08 },
+      lightPresetBold: { strength: 12, smooth: 0, ambient: 0.25, specular: 0.25 },
+      lightPresetFlat: { strength: 0, smooth: 0, ambient: 0.35, specular: 0 }
+    };
+    Object.keys(presets).forEach(function (id) {
+      $(id).addEventListener('click', function () { Object.assign(state, presets[id]); changed(); });
+    });
+    $('lightReset').addEventListener('click', function () {
+      state = PF.lighting.settings({ assetId: state.assetId }); changed();
+    });
     $('lightZoomIn').addEventListener('click', function () { zoom = Math.min(32, appliedZoom + 1); draw(); });
     $('lightZoomOut').addEventListener('click', function () { zoom = Math.max(1, appliedZoom - 1); draw(); });
     $('lightFit').addEventListener('click', function () { zoom = 'fit'; draw(); });

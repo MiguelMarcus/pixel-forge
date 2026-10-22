@@ -156,3 +156,32 @@ test('backup rejeita versão e estrutura inválidas antes de carregar fontes', (
   assert.throws(()=>fromSetFile(JSON.stringify({...valid,items:[{}]})),/asset/);
   assert.throws(()=>fromSetFile(JSON.stringify({...valid,sheet:{width:0}})),/layout/);
 });
+
+test('armazenamento em memória não compartilha referências com receitas editáveis', async () => {
+  const store=createStore();
+  const item={id:'a',params:{sizeW:32}};
+  const write=store.put(item);item.params.sizeW=64;await write;
+  assert.equal((await store.all())[0].params.sizeW,32);
+  const returned=await store.all();returned[0].params.sizeW=128;
+  assert.equal((await store.all())[0].params.sizeW,32);
+  const meta={strength:6};await store.putMeta('lighting',meta);meta.strength=12;
+  const read=await store.getMeta('lighting');read.strength=20;
+  assert.equal((await store.getMeta('lighting')).strength,6);
+});
+
+test('substituição e escrita capturam dados antes da abertura assíncrona', async () => {
+  const fake=fakeIDB();global.indexedDB=fake.api;
+  try {
+    const store=createStore(),records=[{id:'a',params:{sizeW:32}}],metadata={lighting:{strength:6}};
+    const write=store.replace(records,metadata);records[0].params.sizeW=64;metadata.lighting.strength=12;await write;
+    assert.equal((await store.all())[0].params.sizeW,32);
+    assert.equal((await store.getMeta('lighting')).strength,6);
+  } finally {delete global.indexedDB;}
+});
+
+test('grade detecta sobreposição e frames deslocados para fora das células', () => {
+  const asset=solid(32,32);
+  const result=PF.validateSheet({mode:'grid',width:64,height:64,cell:32,placements:[{asset,x:0,y:0},{asset,x:1,y:0}]});
+  assert.equal(result.checks.find(c=>c.id==='overlap').ok,false);
+  assert.equal(result.checks.find(c=>c.id==='gridAlignment').ok,false);
+});

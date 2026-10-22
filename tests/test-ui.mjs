@@ -577,6 +577,91 @@ g('lightMode').dispatch('change', { target: { value: 'luminance' } });
 await new Promise(r => setTimeout(r, 80));
 ok(g('lightDetailRow').classList.contains('hidden'), 'modo luminosidade oculta mistura de silhueta');
 ok(JSON.stringify(lightItem.result.asset) === sourceAssetBefore, 'geração e iluminação preservam o sprite original');
+
+console.log('\n== 16. segunda auditoria: exportação, editor e folhas ==');
+g('profiles').children.find(b => b.dataset.id === 'character').dispatch('click');
+g('sizeCustom').dispatch('input', { target: { value: '48' } });
+g('exportPng').dispatch('click');
+await new Promise(r => setTimeout(r, 100));
+let immediatePng = new DataView(await savedBlobs.at(-1).arrayBuffer());
+ok(immediatePng.getUint32(16) === 48, 'exportação imediata aguarda a última alteração de tamanho');
+await saveBackup();
+g('sizeCustom').dispatch('input', { target: { value: '24' } });
+ok(closeWarns(), 'editar o sprite marca o backup como pendente');
+const editorBackup = await saveBackup();
+ok(editorBackup.editor && editorBackup.editor.params.sizeW === 24 && /^data:image/.test(editorBackup.editor.source), 'backup guarda fonte e última receita do editor');
+const full = PF.tabs.state().items[0];
+g('sheetW').dispatch('input', { target: { value: String(full.result.asset.width) } });
+g('sheetH').dispatch('input', { target: { value: String(full.result.asset.height) } });
+g('sheetCell').dispatch('input', { target: { value: String(full.result.asset.width) } });
+g('sheetClear').dispatch('click');
+function cardButton(card, text) { return card.children.flatMap(row => row.children || []).find(b => b.textContent === text); }
+cardButton(g('libGrid').children[0], 'folha').dispatch('click');
+cardButton(g('libGrid').children[0], 'folha').dispatch('click');
+ok(PF.tabs.state().sheet.placements.length === 1 && /cheia/.test(g('toast').textContent), 'folha cheia não empilha outro sprite em 0,0');
+const onlyEditor = structuredClone(editorBackup);
+onlyEditor.items = []; onlyEditor.anchorId = null; onlyEditor.sheet.placements = []; onlyEditor.lighting.assetId = 'editor';
+await openBackup(onlyEditor);
+ok(PF.tabs.state().items.length === 0 && g('stageDims').textContent === '24×24', 'projeto sem biblioteca restaura o sprite em edição');
+ok((await testStore.getMeta('editor')).params.sizeW === 24, 'editor importado fica disponível após reabrir o navegador');
+PF.tabs.switchTab('lighting');
+g('lightExportNormal').dispatch('click');
+await new Promise(r => setTimeout(r, 100));
+ok(!g('lightExportNormal').disabled && /normal-y/.test(g('saveBarText').textContent), 'normal map volta a funcionar ao abrir backup só do editor');
+ok(!/Sprite-em-edi/.test(g('saveBarText').textContent), 'nome exportado usa o nome do arquivo, sem texto do seletor');
+g('lightPresetBold').dispatch('click');
+ok(PF.lightingTab.settings().strength === 12 && PF.lightingTab.settings().smooth === 0, 'preset marcado aplica relevo e suavização');
+g('lightPresetFlat').dispatch('click');
+ok(PF.lightingTab.settings().strength === 0, 'preset plano elimina inclinação das normais');
+g('lightReset').dispatch('click');
+ok(PF.lightingTab.settings().strength === 6 && PF.lightingTab.settings().assetId === 'editor', 'redefinir controles preserva a origem selecionada');
+g('lightColor').dispatch('input', { target: { value: '#ff0000' } });
+ok(PF.lightingTab.settings().color === '#ff0000', 'cor da luz atualiza durante a edição');
+g('sizeCustom').dispatch('input', { target: { value: '40' } });
+g('lightExportNormal').dispatch('click');
+await new Promise(r => setTimeout(r, 100));
+immediatePng = new DataView(await savedBlobs.at(-1).arrayBuffer());
+ok(immediatePng.getUint32(16) === 40, 'normal map também respeita edição pendente do sprite');
+g('outlineInner').dispatch('change', { target: { checked: true } });
+g('killBW').dispatch('change', { target: { checked: true } });
+g('killBWTol').dispatch('input', { target: { value: '15' } });
+g('silhouette').dispatch('change', { target: { value: 'white' } });
+g('exportJson').dispatch('click');
+await new Promise(r => setTimeout(r, 40));
+const manifest = JSON.parse(await savedBlobs.at(-1).text());
+ok(manifest.params.outlineInner && manifest.params.removeBW && manifest.params.bwTolerance === 15 && manifest.params.silhouette === 'white' &&
+  manifest.params.palette.length > 0 && Array.isArray(manifest.paletteRGBA) && Number.isInteger(manifest.transparentIndex), 'manifesto registra todos os controles novos do pipeline');
+const savedEditor = await saveBackup();
+const brokenEditor = structuredClone(savedEditor); brokenEditor.editor.source = 'data:image/png;base64,BROKEN';
+await openBackup(brokenEditor);
+ok(g('stageDims').textContent === '40×40' && /Não foi possível abrir/.test(g('toast').textContent), 'editor ilegível no backup preserva o projeto atual');
+const originalCreateElement = document.createElement;
+document.createElement = function (tag) {
+  const element = originalCreateElement(tag);
+  if (tag === 'canvas') element.getContext = () => ({ drawImage() {}, getImageData() { throw new Error('canvas indisponível'); } });
+  return element;
+};
+await openBackup(savedEditor);
+document.createElement = originalCreateElement;
+ok(!document.body.inert && /canvas indisponível/.test(g('toast').textContent), 'falha do canvas rejeita importação e não deixa a interface bloqueada');
+const legacy = structuredClone(savedEditor); delete legacy.editor;
+await openBackup(legacy);
+ok(g('lightExportNormal').disabled && g('fileName').textContent === 'nenhuma imagem', 'backup antigo sem editor abre e limpa a imagem do projeto anterior');
+
+const vm = await import('node:vm');
+const startupEvents = [], startupStore = originalCreateStore();
+await startupStore.replace([], { editor: savedEditor.editor, project: { profile: savedEditor.profile, contract: savedEditor.contract }, lighting: { assetId: 'editor' } });
+const bootPF = Object.assign({}, PF, { lightingTab: { init() {}, render() {}, restore() { startupEvents.push('lighting'); } } });
+vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/tabs.js'), 'utf8'), {
+  self: { PF: bootPF }, window: windowStub, document, Image: ImageStub, setTimeout, clearTimeout
+});
+bootPF.tabs.init({ store: startupStore, getEditor() { return null; }, flushEditor() {},
+  getProfile() { return savedEditor.profile; }, getContract() { return savedEditor.contract; },
+  restoreProject() { startupEvents.push('project'); }, restoreEditor() { startupEvents.push('editor'); },
+  toast() {}, saveBytes() { return Promise.resolve(); } });
+ok(document.body.inert, 'interface aguarda o carregamento inicial antes de aceitar novas edições');
+await new Promise(r => setTimeout(r, 100));
+ok(startupEvents.join(',') === 'project,editor,lighting' && !document.body.inert, 'inicialização restaura o editor antes da origem da iluminação e libera a interface');
 g('saveBarClose').dispatch('click');
 console.log('\n----------------------------------------');
 console.log(passes + ' passaram, ' + failures + ' falharam');

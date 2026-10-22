@@ -162,10 +162,12 @@
   }
 
   function currentSnapshot() {
+    flushRecompute();
     return snapshotFor(state.source, state.sourceName);
   }
 
   function saveToLibrary() {
+    flushRecompute();
     if (!state.result || !state.source) return;
     try {
       PF.tabs.addItem(currentSnapshot());
@@ -176,7 +178,7 @@
     }
   }
 
-  function loadItem(item) {
+  function loadItem(item, silent) {
     state.source = item.source;
     state.sourceName = item.name;
     state.profile = item.profile || state.profile;
@@ -190,8 +192,29 @@
     $('palettePreset').value = 'custom';
     syncControls();
     recompute();
-    PF.tabs.switchTab('sprite');
-    toast('“' + item.name + '” carregado no editor.');
+    $('fileName').textContent = state.sourceName + ' · ' + state.source.width + '×' + state.source.height;
+    if (!silent) {
+      PF.tabs.markDirty();
+      PF.tabs.switchTab('sprite');
+      toast('“' + item.name + '” carregado no editor.');
+    }
+  }
+
+  function restoreEditor(item) {
+    clearTimeout(timer); timer = null;
+    if (item) {
+      // O cabeçalho do projeto é a autoridade para perfil e contrato globais.
+      loadItem(Object.assign({}, item, { profile: state.profile, contract: state.contract }), true);
+      return;
+    }
+    state.source = null; state.result = null; state.sourceName = ''; state.prepared = null;
+    $('fileName').textContent = 'nenhuma imagem';
+    $('emptyState').classList.remove('hidden'); $('compare').classList.add('hidden');
+    $('stageDims').textContent = '—'; $('stageInfo').textContent = '';
+    $('checks').innerHTML = ''; $('stats').innerHTML = ''; $('swatches').innerHTML = '';
+    $('verdict').textContent = '—'; $('verdict').className = 'verdict';
+    updateExportEnabled();
+    PF.lightingTab.render();
   }
 
   function dominantBorderColor(img) {
@@ -320,7 +343,12 @@
   var timer = null;
   function schedule() {
     clearTimeout(timer);
-    timer = setTimeout(recompute, 80);
+    timer = setTimeout(function () { timer = null; recompute(); }, 80);
+    if (state.source) PF.tabs.markDirty();
+  }
+
+  function flushRecompute() {
+    if (timer) { clearTimeout(timer); timer = null; recompute(); }
   }
 
   function recompute() {
@@ -364,6 +392,7 @@
       console.error(err);
       state.result = null;
       updateExportEnabled();
+      PF.lightingTab.render();
       toast('Erro no pipeline: ' + err.message);
       return;
     }
@@ -582,6 +611,7 @@
     }
 
     state.source = image;
+    PF.tabs.markDirty();
     state.sourceName = name || 'imagem';
     state.extracted = null;
     if (state.paletteMode === 'extracted') state.paletteMode = 'pico8';
@@ -613,13 +643,18 @@
     return new Promise(function (resolve, reject) {
       var img = new Image();
       img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        var ctx = c.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(img, 0, 0);
-        var d = ctx.getImageData(0, 0, c.width, c.height);
-        resolve({ width: c.width, height: c.height, data: d.data });
+        try {
+          if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth > 8192 || img.naturalHeight > 8192 || img.naturalWidth * img.naturalHeight > 16777216) {
+            throw new Error('imagem excede o limite de 16 megapixels ou 8192 px por lado');
+          }
+          var c = document.createElement('canvas');
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          var ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          var d = ctx.getImageData(0, 0, c.width, c.height);
+          resolve({ width: c.width, height: c.height, data: d.data });
+        } catch (e) { reject(e); }
       };
       img.onerror = function () { reject(new Error('imagem ilegível')); };
       img.src = url;
@@ -907,6 +942,7 @@
   }
 
   function exportPNG(scale) {
+    flushRecompute();
     if (!state.result) return;
     var asset = state.result.asset;
     var tagged = scale > 1 ? PF.scaleNearest(asset, scale) : asset;
@@ -919,6 +955,7 @@
   }
 
   function exportAseprite() {
+    flushRecompute();
     if (!state.result) return;
     if (typeof PF.encodeAseprite !== 'function') {
       toast('O encoder .aseprite não carregou (src/aseprite.js).');
@@ -938,6 +975,7 @@
   }
 
   function exportGPL() {
+    flushRecompute();
     if (!state.result) return;
     runExport({
       label: '.gpl',
@@ -950,6 +988,7 @@
   }
 
   function exportJSON() {
+    flushRecompute();
     if (!state.result) return;
     runExport({
       label: 'manifesto',
@@ -983,9 +1022,21 @@
             outline: state.params.outline,
             outlineRadius: state.params.outlineRadius,
             outlineDiag: state.params.outlineDiag,
+            outlineAuto: state.params.outlineAuto !== false,
+            outlineColor: state.params.outlineColor,
+            outlineInner: !!state.params.outlineInner,
+            removeBW: !!state.params.removeBW,
+            bwTolerance: state.params.bwTolerance,
+            silhouette: state.params.silhouette || 'off',
+            palette: getPalette().filter(function (c) { return c.a > 0; }).map(PF.rgbToHex),
+            effectiveMargin: (state.params.outline && !state.params.outlineInner)
+              ? Math.max(state.params.margin || 0, Math.min(8, state.params.outlineRadius || 1))
+              : (state.params.margin || 0),
             orphanCleanup: state.params.orphanCleanup
           },
           palette: r.asset.palette.map(PF.rgbToHex),
+          paletteRGBA: r.asset.palette,
+          transparentIndex: r.asset.transparentIndex,
           checks: r.checks,
           conform: r.ok,
           stats: {
@@ -1521,7 +1572,7 @@
     renderProfiles();
     syncControls();
 
-    PF.tabs.init({
+    var projectReady = PF.tabs.init({
       store: STORE,
       toast: toast,
       download: download,
@@ -1529,6 +1580,9 @@
       loadIntoEditor: loadItem,
       getProfile: function () { return state.profile; },
       getEditor: function () { return state.result ? { asset: state.result.asset, name: safeName() } : null; },
+      getEditorSnapshot: function () { flushRecompute(); return state.source && state.result ? currentSnapshot() : null; },
+      flushEditor: flushRecompute,
+      restoreEditor: restoreEditor,
       getContract: function () { return state.contract; },
       restoreProject: restoreProject
     });
@@ -1568,10 +1622,10 @@
       var qp = new URLSearchParams(window.location.search);
       var demo = qp.get('demo') || qp.get('sample');
       if (demo) {
-        setTimeout(function () {
+        Promise.resolve(projectReady).then(function () {
           var s = demo === 'slime' ? sampleSlime() : samplePotion();
           setSource(s.image, s.name);
-        }, 0);
+        });
       }
     } catch (_) { /* sem URLSearchParams: ignora */ }
   }

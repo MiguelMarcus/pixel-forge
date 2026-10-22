@@ -12,7 +12,7 @@
   <div class="brand">
     <span class="mark" aria-hidden="true"></span>
     <span class="name">PIXEL FORGE</span>
-    <span class="tag">v1.5 · local</span>
+    <span class="tag">v1.5.1 · local</span>
   </div>
   <nav class="tabs" id="tabs">
     <button class="tab-btn active" data-tab="sprite" type="button">Sprite</button>
@@ -592,6 +592,11 @@
         </section>
         <section class="panel">
           <h2>Relevo · bump mapping</h2>
+          <div class="row gap light-presets" role="group" aria-label="Presets de relevo">
+            <button class="btn ghost sm" id="lightPresetSoft" type="button">suave</button>
+            <button class="btn ghost sm" id="lightPresetBold" type="button">marcado</button>
+            <button class="btn ghost sm" id="lightPresetFlat" type="button">plano</button>
+          </div>
           <label class="field"><span>Construir a altura</span><select id="lightMode">
             <option value="silhouette">volume pela silhueta</option>
             <option value="luminance">luminosidade da imagem</option>
@@ -603,6 +608,7 @@
           <label class="check"><input id="lightInvert" type="checkbox" /> inverter altura (cavado)</label>
           <label class="check"><input id="lightFlipY" type="checkbox" /> inverter verde (Y− / DirectX)</label>
           <p class="export-note">Padrão Y+ / OpenGL. A inversão de verde adapta o normal map ao motor e não muda a prévia.</p>
+          <button class="btn ghost block sm" id="lightReset" type="button">redefinir relevo e luz</button>
         </section>
         <section class="panel">
           <h2>Luz de teste</h2>

@@ -234,6 +234,9 @@ continuam abrindo com os padrões da nova aba. A cor base deve preferencialmente
 chapadas: o algoritmo estima o relevo e não remove iluminação já pintada na imagem.
 Sombras projetadas nos outros objetos dependem do sistema de luz do motor.
 
+Os presets **suave**, **marcado** e **plano** são pontos de partida para o relevo.
+**Redefinir relevo e luz** volta aos padrões sem trocar o sprite selecionado.
+
 ---
 
 ## Contrato (o juiz)
@@ -332,9 +335,10 @@ arquivo gerado, ele lê um `.aseprite` salvo pelo próprio Aseprite
 iguais. Se o parser entende o arquivo do Aseprite, o entendimento do container está certo;
 depois disso, comparar o gerado com o PNG exportado é verificação real.
 
-Estado atual: **104/104** no core, **107/107** na UI, **11/11** cenários de regressão,
+Estado atual: **104/104** no core, **126/126** na UI, **14/14** cenários de regressão,
 **9/9** cenários de relevo/iluminação, **25/25** na verificação do PNG indexado,
-**18/18** na do `.aseprite` e **3/3** arquivos RGBA verificados com Pillow.
+**18/18** na do `.aseprite`, **3/3** arquivos RGBA verificados com Pillow e **1/1** teste
+do pacote de publicação.
 
 `npm test` executa núcleo, UI e regressões com Node 22 ou superior. Para os verificadores
 independentes, instale Pillow (`python -m pip install Pillow`) e rode `npm run test:formats`
@@ -352,6 +356,12 @@ Importar `.pfset` valida a estrutura, decodifica as fontes e prepara as receitas
 substituir o acervo. Itens e metadados são gravados juntos; uma falha preserva o projeto
 anterior. Erros de IndexedDB aparecem na interface: salve um `.pfset` para preservar o
 trabalho da sessão. As correções da auditoria estão descritas em `CHANGELOG.md`.
+
+O `.pfset` inclui também o **sprite em edição**, mesmo sem salvá-lo na Biblioteca.
+Editar esse sprite marca o backup como pendente. Fontes acima de 16 megapixels ou
+8192 px por lado são recusadas antes da leitura de pixels para evitar travar o canvas.
+O manifesto registra a receita, a margem efetiva e a paleta RGBA, além dos índices de
+transparência. Veja a [segunda auditoria](docs/audit-1.5.1.md).
 
 ---
 

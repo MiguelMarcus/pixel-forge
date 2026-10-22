@@ -1,5 +1,18 @@
 # Alterações
 
+## 1.5.1
+
+- Backups incluem fonte e receita do sprite em edição, mesmo sem assets na biblioteca; importação valida esse sprite antes de substituir o projeto.
+- PNG, normal map, manifesto e backup usam a última alteração dos controles, mesmo quando exportados antes do reprocessamento programado.
+- Armazenamento copia receitas na entrada e na leitura, impedindo alterações não gravadas por compartilhamento de referências.
+- Folha cheia deixa de empilhar sprites em 0,0; validação de sobreposição e alinhamento também roda no modo grade.
+- Manifesto inclui os controles de contorno interno, cor, silhueta e remoção de preto/branco, paleta base, margem efetiva e alpha da paleta final.
+- Abertura do projeto protege contra edição durante o carregamento e restaura o editor antes da origem da iluminação. Falhas de leitura do canvas liberam a interface e preservam o projeto anterior.
+- Presets suave/marcado/plano, botão para redefinir relevo e luz, atualização contínua da cor e nomes de exportação sem texto do seletor.
+- Layout sem painel sobreposto em telas médias; abas roláveis e painéis acessíveis em telas pequenas. Imagens grandes podem ser percorridas desde o canto superior esquerdo.
+- Scripts e CSS publicados recebem versão pelo conteúdo para evitar mistura de arquivos antigos e novos no navegador.
+- Segunda auditoria documentada em `docs/audit-1.5.1.md`, com novos testes de regressão.
+
 ## 1.5.0
 
 - Nova aba Relevo e luz: sprite do editor ou da biblioteca, bump por silhueta ou luminosidade, mistura de detalhes, suavização, inversão de altura e força do relevo.
