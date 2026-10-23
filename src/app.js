@@ -162,12 +162,11 @@
   }
 
   function currentSnapshot() {
-    flushRecompute();
     return snapshotFor(state.source, state.sourceName);
   }
 
-  function saveToLibrary() {
-    flushRecompute();
+  async function saveToLibrary() {
+    await flushRecompute();
     if (!state.result || !state.source) return;
     try {
       PF.tabs.addItem(currentSnapshot());
@@ -201,6 +200,7 @@
   }
 
   function restoreEditor(item) {
+    cancelConversion();
     clearTimeout(timer); timer = null;
     if (item) {
       // O cabeçalho do projeto é a autoridade para perfil e contrato globais.
@@ -341,17 +341,35 @@
   /* ---------------------------------------------------------------- pipeline */
 
   var timer = null;
+  var conversion = null, conversionId = 0;
+  function cancelConversion() {
+    conversionId++;
+    if (conversion) {
+      conversion.worker.terminate();
+      conversion.resolve();
+      conversion = null;
+    }
+    $('conversionStatus').classList.add('hidden');
+  }
   function schedule() {
+    cancelConversion();
+    state.result = null; updateExportEnabled();
     clearTimeout(timer);
     timer = setTimeout(function () { timer = null; recompute(); }, 80);
     if (state.source) PF.tabs.markDirty();
   }
 
-  function flushRecompute() {
+  async function flushRecompute() {
     if (timer) { clearTimeout(timer); timer = null; recompute(); }
+    while (conversion || timer) {
+      if (conversion) await conversion.promise;
+      if (timer) { clearTimeout(timer); timer = null; recompute(); }
+    }
   }
 
   function recompute() {
+    cancelConversion();
+    clearTimeout(timer); timer = null;
     if (!state.source) return;
     var prepared = prepare();
     if (!prepared) return;
@@ -362,7 +380,7 @@
     var p = state.params;
     var result;
     try {
-      result = PF.conform(prepared, {
+      var options = {
         targetW: p.sizeW,
         targetH: p.sizeH,
         margin: (p.outline && !p.outlineInner)
@@ -387,8 +405,32 @@
         outlineColor: p.outlineAuto === false ? p.outlineColor : null,
         orphanCleanup: p.orphanCleanup,
         contract: state.contract
-      });
+      };
+      if (p.mode === 'structure' && typeof Worker !== 'undefined' && window.location.protocol !== 'file:') {
+        state.result = null; updateExportEnabled();
+        var id = conversionId;
+        var worker = new Worker(new URL('src/pipeline-worker.js?v=' + Date.now(), document.baseURI));
+        var resolve;
+        var promise = new Promise(function (done) { resolve = done; });
+        conversion = { worker: worker, promise: promise, resolve: resolve };
+        $('conversionStatus').classList.remove('hidden');
+        worker.onmessage = function (event) {
+          if (id !== conversionId) return;
+          cancelConversion();
+          if (event.data.error) { toast('Erro na análise: ' + event.data.error); return; }
+          showConversion(event.data.result, prepared);
+        };
+        worker.onerror = function () {
+          if (id !== conversionId) return;
+          cancelConversion();
+          toast('Não foi possível executar a análise em segundo plano. Tente pixel art limpa.');
+        };
+        worker.postMessage({ image: prepared, options: options });
+        return;
+      }
+      result = PF.conform(prepared, options);
     } catch (err) {
+      cancelConversion();
       console.error(err);
       state.result = null;
       updateExportEnabled();
@@ -396,7 +438,10 @@
       toast('Erro no pipeline: ' + err.message);
       return;
     }
+    showConversion(result, prepared);
+  }
 
+  function showConversion(result, prepared) {
     state.result = result;
     state.prepared = prepared;
 
@@ -941,8 +986,8 @@
       });
   }
 
-  function exportPNG(scale) {
-    flushRecompute();
+  async function exportPNG(scale) {
+    await flushRecompute();
     if (!state.result) return;
     var asset = state.result.asset;
     var tagged = scale > 1 ? PF.scaleNearest(asset, scale) : asset;
@@ -954,8 +999,8 @@
     });
   }
 
-  function exportAseprite() {
-    flushRecompute();
+  async function exportAseprite() {
+    await flushRecompute();
     if (!state.result) return;
     if (typeof PF.encodeAseprite !== 'function') {
       toast('O encoder .aseprite não carregou (src/aseprite.js).');
@@ -974,8 +1019,8 @@
     });
   }
 
-  function exportGPL() {
-    flushRecompute();
+  async function exportGPL() {
+    await flushRecompute();
     if (!state.result) return;
     runExport({
       label: '.gpl',
@@ -987,8 +1032,8 @@
     });
   }
 
-  function exportJSON() {
-    flushRecompute();
+  async function exportJSON() {
+    await flushRecompute();
     if (!state.result) return;
     runExport({
       label: 'manifesto',
@@ -1052,7 +1097,8 @@
     });
   }
 
-  function copyPalette() {
+  async function copyPalette() {
+    await flushRecompute();
     if (!state.result) return;
     var txt = state.result.asset.palette
       .filter(function (c) { return c.a > 0; })
@@ -1558,6 +1604,13 @@
   /* ---------------------------------------------------------------- start */
 
   function init() {
+    $('cancelConversion').addEventListener('click', function () {
+      clearTimeout(timer); timer = null;
+      cancelConversion();
+      state.result = null; updateExportEnabled();
+      PF.lightingTab.render();
+      toast('Análise cancelada. Altere uma opção para processar novamente.');
+    });
     // qualquer falha silenciosa vira aviso visível
     window.addEventListener('error', function (e) {
       toast('Erro: ' + (e.message || 'desconhecido'));
@@ -1580,7 +1633,7 @@
       loadIntoEditor: loadItem,
       getProfile: function () { return state.profile; },
       getEditor: function () { return state.result ? { asset: state.result.asset, name: safeName() } : null; },
-      getEditorSnapshot: function () { flushRecompute(); return state.source && state.result ? currentSnapshot() : null; },
+      getEditorSnapshot: async function () { await flushRecompute(); return state.source ? currentSnapshot() : null; },
       flushEditor: flushRecompute,
       restoreEditor: restoreEditor,
       getContract: function () { return state.contract; },

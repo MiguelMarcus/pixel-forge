@@ -124,7 +124,9 @@
       <label class="field">
         <span>Amostragem</span>
         <select id="resampleMode">
-          <option value="dominant">dominante (recomendado)</option>
+          <option value="structure">análise de regiões (mais lenta)</option>
+          <option value="clean">pixel art limpa (recomendado)</option>
+          <option value="dominant">dominante (tons originais)</option>
           <option value="box">média (box)</option>
           <option value="nearest">mais próximo</option>
         </select>
@@ -668,6 +670,10 @@
   <button class="sb-close" id="saveBarClose" type="button" aria-label="fechar">×</button>
 </div>
 
+<div class="save-bar hidden" id="conversionStatus" role="status" aria-live="polite">
+  <span>Analisando regiões… Os controles continuam disponíveis.</span>
+  <button id="cancelConversion" type="button">Cancelar análise</button>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="src/core.js"></script>

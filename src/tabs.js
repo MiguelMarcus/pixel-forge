@@ -1190,8 +1190,8 @@
       toast('Biblioteca esvaziada.');
     });
 
-    $('libSaveFile').addEventListener('click', function () {
-      var editor = deps.getEditorSnapshot();
+    $('libSaveFile').addEventListener('click', async function () {
+      var editor = await deps.getEditorSnapshot();
       var data = PF.library.toSetFile({
         profile: deps.getProfile(),
         contract: deps.getContract(),

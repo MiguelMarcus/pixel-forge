@@ -199,12 +199,13 @@
     var sd = src.data, od = out.data;
     var dom = null;
 
+    var exact = mode === 'clean' || mode === 'structure';
     if (mode === 'dominant') {
       if (!DOM_BUF) {
         DOM_BUF = {
-          gen: new Uint32Array(DOM_SIZE), n: new Uint32Array(DOM_SIZE),
-          r: new Uint32Array(DOM_SIZE), g: new Uint32Array(DOM_SIZE),
-          b: new Uint32Array(DOM_SIZE), keys: new Int32Array(DOM_SIZE)
+          gen: new Uint32Array(DOM_SIZE), n: new Float64Array(DOM_SIZE),
+          r: new Float64Array(DOM_SIZE), g: new Float64Array(DOM_SIZE),
+          b: new Float64Array(DOM_SIZE), keys: new Int32Array(DOM_SIZE)
         };
       }
       dom = DOM_BUF;
@@ -226,6 +227,7 @@
         if (x1 > sw) x1 = sw;
 
         var o = (y * dw + x) * 4;
+        var votes = exact ? new Map() : null;
 
         if (mode === 'nearest') {
           var sx = Math.min(sw - 1, Math.floor(((x + 0.5) * sw) / dw));
@@ -241,25 +243,32 @@
           for (var xx = x0; xx < x1; xx++) {
             var i = (yy * sw + xx) * 4;
             var a = sd[i + 3];
-            n++;
-            countA += a;
+            // Exact pixel/cell overlap matters at non-integer reduction ratios.
+            var weight = (Math.min(xx + 1, (x + 1) * sw / dw) - Math.max(xx, x * sw / dw)) *
+              (Math.min(yy + 1, (y + 1) * sh / dh) - Math.max(yy, y * sh / dh));
+            n += weight;
+            countA += a * weight;
             if (a === 0) continue;
 
-            sa += a;
+            var coverage = a * weight;
+            sa += coverage;
 
-            if (dom) {
+            if (votes) {
+              var rgbKey = (sd[i] << 16) | (sd[i + 1] << 8) | sd[i + 2];
+              votes.set(rgbKey, (votes.get(rgbKey) || 0) + coverage);
+            } else if (dom) {
               var key = ((sd[i] >> 3) << 10) | ((sd[i + 1] >> 3) << 5) | (sd[i + 2] >> 3);
               if (dom.gen[key] !== DOM_STAMP) {
                 dom.gen[key] = DOM_STAMP;
                 dom.n[key] = 0; dom.r[key] = 0; dom.g[key] = 0; dom.b[key] = 0;
                 dom.keys[nKeys++] = key;
               }
-              dom.n[key]++;
-              dom.r[key] += sd[i];
-              dom.g[key] += sd[i + 1];
-              dom.b[key] += sd[i + 2];
+              dom.n[key] += coverage;
+              dom.r[key] += sd[i] * coverage;
+              dom.g[key] += sd[i + 1] * coverage;
+              dom.b[key] += sd[i + 2] * coverage;
             } else {
-              sr += sd[i] * a; sg += sd[i + 1] * a; sb += sd[i + 2] * a;
+              sr += sd[i] * coverage; sg += sd[i + 1] * coverage; sb += sd[i + 2] * coverage;
             }
           }
         }
@@ -272,11 +281,20 @@
         var alpha = Math.round(countA / n);
         od[o + 3] = alpha;
 
-        if (dom) {
+        if (votes) {
+          var winner = -1, winnerWeight = -1;
+          votes.forEach(function (value, key) {
+            // Stable RGB ordering breaks exact ties independently of scan order.
+            if (value > winnerWeight + 1e-8 || (Math.abs(value - winnerWeight) <= 1e-8 && key < winner)) {
+              winner = key; winnerWeight = value;
+            }
+          });
+          od[o] = winner >> 16; od[o + 1] = (winner >> 8) & 255; od[o + 2] = winner & 255;
+        } else if (dom) {
           var bestKey = -1, bestN = -1;
           for (var k = 0; k < nKeys; k++) {
             var kk = dom.keys[k];
-            if (dom.n[kk] > bestN) { bestN = dom.n[kk]; bestKey = kk; }
+            if (dom.n[kk] > bestN + 1e-8 || (Math.abs(dom.n[kk] - bestN) <= 1e-8 && kk < bestKey)) { bestN = dom.n[kk]; bestKey = kk; }
           }
           od[o] = Math.round(dom.r[bestKey] / bestN);
           od[o + 1] = Math.round(dom.g[bestKey] / bestN);
@@ -289,6 +307,85 @@
       }
     }
     return out;
+  }
+
+  // Bilateral filtering: nearby, similarly colored pixels support each other;
+  // strong color edges and transparent boundaries do not contribute.
+  function analyzeRegions(src) {
+    var out = cloneImage(src), w = src.width, h = src.height, d = src.data;
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var p = (y * w + x) * 4;
+      if (!d[p + 3]) continue;
+      var r = 0, g = 0, b = 0, total = 0;
+      for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) {
+        var xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        var q = (yy * w + xx) * 4;
+        if (!d[q + 3]) continue;
+        var dr = d[q] - d[p], dg = d[q + 1] - d[p + 1], db = d[q + 2] - d[p + 2];
+        var distance = (dr * dr + dg * dg + db * db) / 3;
+        if (Math.max(Math.abs(dr), Math.abs(dg), Math.abs(db)) > 48) continue;
+        var weight = Math.exp(-(dx * dx + dy * dy) / 4 - distance / (2 * 20 * 20)) * d[q + 3] / 255;
+        r += d[q] * weight; g += d[q + 1] * weight; b += d[q + 2] * weight; total += weight;
+      }
+      out.data[p] = Math.round(r / total); out.data[p + 1] = Math.round(g / total);
+      out.data[p + 2] = Math.round(b / total);
+    }
+    return out;
+  }
+
+  // Only isolated, low-contrast color specks inside solid regions qualify.
+  // Connected lines, silhouettes, gaps, and high-contrast highlights survive.
+  function cleanRegionSpecks(asset) {
+    var src = asset.indices, out = new Uint8Array(src), w = asset.width, h = asset.height;
+    for (var y = 1; y < h - 1; y++) for (var x = 1; x < w - 1; x++) {
+      var p = y * w + x, current = src[p], c = asset.palette[current];
+      if (!c.a) continue;
+      var counts = new Map(), isolated = true, opaque = true;
+      for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        var index = src[p + dy * w + dx];
+        if (index === current) isolated = false;
+        if (!asset.palette[index].a) opaque = false;
+        counts.set(index, (counts.get(index) || 0) + 1);
+      }
+      if (!isolated || !opaque) continue;
+      counts.forEach(function (count, index) {
+        var next = asset.palette[index];
+        if (count >= 6 && Math.max(Math.abs(c.r-next.r), Math.abs(c.g-next.g), Math.abs(c.b-next.b)) <= 32) out[p] = index;
+      });
+    }
+    // Extend cleanup only to complete 2x2 islands. Eight-connected components
+    // protect diagonal lines; pairs and L-shaped details remain untouched.
+    var seen = new Uint8Array(src.length);
+    for (var start = 0; start < src.length; start++) {
+      if (seen[start] || !asset.palette[src[start]].a) continue;
+      var component = [start], color = src[start]; seen[start] = 1;
+      var minX = w, minY = h, maxX = -1, maxY = -1;
+      for (var head = 0; head < component.length; head++) {
+        var cp = component[head], cx = cp % w, cy = Math.floor(cp / w);
+        minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
+        minY = Math.min(minY, cy); maxY = Math.max(maxY, cy);
+        for (var oy = -1; oy <= 1; oy++) for (var ox = -1; ox <= 1; ox++) {
+          var nx = cx + ox, ny = cy + oy, np = ny * w + nx;
+          if (nx < 0 || nx >= w || ny < 0 || ny >= h || seen[np] || src[np] !== color) continue;
+          seen[np] = 1; component.push(np);
+        }
+      }
+      if (component.length !== 4 || maxX-minX !== 1 || maxY-minY !== 1 || minX === 0 || minY === 0 || maxX === w-1 || maxY === h-1) continue;
+      var surround = -1, uniform = true;
+      for (var ry = minY-1; ry <= maxY+1; ry++) for (var rx = minX-1; rx <= maxX+1; rx++) {
+        if (rx >= minX && rx <= maxX && ry >= minY && ry <= maxY) continue;
+        var neighbor = src[ry*w+rx];
+        if (!asset.palette[neighbor].a || (surround >= 0 && neighbor !== surround)) uniform = false;
+        surround = neighbor;
+      }
+      var original = asset.palette[color], replacement = asset.palette[surround];
+      if (uniform && Math.max(Math.abs(original.r-replacement.r), Math.abs(original.g-replacement.g), Math.abs(original.b-replacement.b)) <= 24) {
+        component.forEach(function (pixel) { out[pixel] = surround; });
+      }
+    }
+    return Object.assign({}, asset, { indices: out });
   }
 
   function blitAt(dst, src, ox, oy) {
@@ -1058,6 +1155,35 @@
     var align = o.align || 'center';
     var scaled;
 
+    var availableW = Math.max(1, o.targetW - (fit === 'cover' ? 0 : margin * 2));
+    var availableH = Math.max(1, o.targetH - (fit === 'cover' ? 0 : margin * 2));
+    var reducing = fit === 'stretch' ? img.width > availableW || img.height > availableH :
+      (fit === 'cover' ? Math.max(availableW / img.width, availableH / img.height) :
+        Math.min(availableW / img.width, availableH / img.height)) < 1;
+    if (o.mode === 'structure' && reducing) {
+      // Bound analysis cost while retaining more spatial detail than the output.
+      var analysisScale = Math.min(1, Math.max(768, availableW, availableH) / Math.max(img.width, img.height),
+        Math.max(availableW / img.width, availableH / img.height) * 3);
+      if (analysisScale < 1) img = resample(img, Math.max(1, Math.round(img.width * analysisScale)),
+        Math.max(1, Math.round(img.height * analysisScale)), 'box');
+      img = analyzeRegions(img);
+      stages.regionAnalysis = { w: img.width, h: img.height };
+    }
+
+    // Resolve competing shades into the final palette before counting votes.
+    // Keep alpha independent: pre-quantization must not expand the silhouette.
+    if ((o.mode === 'clean' || o.mode === 'structure') && reducing) {
+      var groupColors = o.palette.filter(function (color) { return color.a > 0; });
+      if (!groupColors.length) throw new Error('paleta vazia');
+      var groupCache = new Map();
+      for (var gp = 0; gp < img.data.length; gp += 4) {
+        if (!img.data[gp + 3]) continue;
+        var gc = groupColors[nearestIndex(img.data[gp], img.data[gp + 1], img.data[gp + 2], groupColors, groupCache)];
+        img.data[gp] = gc.r; img.data[gp + 1] = gc.g; img.data[gp + 2] = gc.b;
+      }
+      stages.paletteBeforeReduction = true;
+    }
+
     if (fit === 'cover') {
       scaled = fitCover(img, o.targetW, o.targetH, o.mode);
     } else {
@@ -1078,6 +1204,7 @@
 
     var q = quantize(scaled, o.palette, { dither: o.dither, amount: o.ditherAmount });
     var asset = q.asset;
+    if (o.mode === 'structure' && reducing && o.dither === 'none') asset = cleanRegionSpecks(asset);
     stages.colors = q.colors.length;
 
     if (o.silhouette === 'black' || o.silhouette === 'white') {
@@ -1561,6 +1688,8 @@
     autoCrop: autoCrop,
     boundsOfOpaque: boundsOfOpaque,
     resample: resample,
+    analyzeRegions: analyzeRegions,
+    cleanRegionSpecks: cleanRegionSpecks,
     fitContain: fitContain,
     alphaThreshold: alphaThreshold,
     quantize: quantize,

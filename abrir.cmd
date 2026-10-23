@@ -1,3 +1,8 @@
 @echo off
-rem Abre o Pixel Forge no navegador padrao (sem servidor).
-start "" "%~dp0index.html"
+cd /d "%~dp0"
+python launch.py
+if errorlevel 1 (
+  echo Nao foi possivel iniciar o servidor. Abrindo o modo direto, sem analise em segundo plano.
+  start "" "%~dp0index.html"
+  pause
+)

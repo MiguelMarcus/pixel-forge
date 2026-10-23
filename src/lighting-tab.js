@@ -104,9 +104,9 @@
     changed();
   }
 
-  function exportMap(kind) {
+  async function exportMap(kind) {
     if (state.assetId === 'editor') {
-      deps.flushEditor();
+      await deps.flushEditor();
       if (!deps.getEditor()) { deps.toast('Corrija o sprite em edição antes de exportar o mapa.'); return; }
     }
     var item = active();

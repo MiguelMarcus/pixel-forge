@@ -668,6 +668,40 @@ bootPF.tabs.init({ store: startupStore, getEditor() { return null; }, flushEdito
 ok(document.body.inert, 'interface aguarda o carregamento inicial antes de aceitar novas edições');
 await new Promise(r => setTimeout(r, 100));
 ok(startupEvents.join(',') === 'project,editor,lighting' && !document.body.inert, 'inicialização restaura o editor antes da origem da iluminação e libera a interface');
+// Exercise real app orchestration with a controllable worker transport.
+fileInput.dispatch('change', { target: { files: [{ type: 'image/png', name: 'worker.png' }] } });
+await new Promise(r=>setTimeout(r,150));
+const workers=[];
+globalThis.Worker=class {
+  constructor() { workers.push(this); }
+  postMessage(data) { this.data=structuredClone(data); }
+  terminate() { this.terminated=true; }
+  complete() { this.onmessage({data:{result:PF.conform(this.data.image,this.data.options)}}); }
+};
+document.baseURI='http://localhost:8080/';windowStub.location.protocol='http:';
+g('resampleMode').dispatch('change',{target:{value:'structure'}});
+await new Promise(r=>setTimeout(r,120));
+const firstWorker=workers.at(-1);
+ok(!!firstWorker && !g('conversionStatus').classList.contains('hidden'), 'análise inicia worker e mostra cancelamento');
+g('sizeCustom').dispatch('input',{target:{value:'32'}});
+ok(firstWorker.terminated, 'nova edição interrompe worker anterior imediatamente');
+await new Promise(r=>setTimeout(r,120));
+const latestWorker=workers.at(-1);
+firstWorker.complete();
+ok(g('exportPng').disabled, 'resultado atrasado não habilita exportação');
+const priorLink=g('saveBarLink').download;
+g('exportPng').dispatch('click');
+await new Promise(r=>setTimeout(r,20));
+ok(g('saveBarLink').download===priorLink, 'exportação aguarda resultado do worker');
+latestWorker.complete();
+await new Promise(r=>setTimeout(r,100));
+ok(g('stageDims').textContent==='32×32' && /32x32/.test(g('saveBarLink').download), 'exportação usa o tamanho da análise atual');
+g('sizeCustom').dispatch('input',{target:{value:'40'}});
+await new Promise(r=>setTimeout(r,120));
+const cancelled=workers.at(-1);
+g('cancelConversion').dispatch('click');cancelled.complete();
+ok(cancelled.terminated && g('exportPng').disabled && g('conversionStatus').classList.contains('hidden'), 'cancelamento termina worker e descarta seu resultado');
+delete globalThis.Worker;
 g('saveBarClose').dispatch('click');
 console.log('\n----------------------------------------');
 console.log(passes + ' passaram, ' + failures + ' falharam');

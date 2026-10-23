@@ -402,3 +402,38 @@ pixel-forge/
 
 O `core.js` não toca no DOM — é o mesmo arquivo no navegador (`window.PF`) e no Node
 (`module.exports`). É por isso que o pipeline é testável de verdade.
+# Redução para pixel art limpa
+
+**Processamento em segundo plano:** abra com `abrir.cmd` (Python 3.10 ou superior)
+para usar o servidor local em `http://127.0.0.1:7867`. O modo de análise de regiões
+roda em um Worker, pode ser cancelado e descarta resultados de edições antigas.
+Exportações e backup aguardam a edição atual. No HTML aberto diretamente como
+arquivo, ou sem suporte a Worker, o processamento usa o modo síncrono anterior.
+O servidor só oferece os arquivos estáticos do aplicativo, no próprio computador.
+O endereço local tem armazenamento separado do HTML direto e do Pages: para
+transferir sua biblioteca, salve e importe o backup `.pfset`.
+
+Para uma análise adicional, escolha **análise de regiões (mais lenta)** em
+**Amostragem**. Antes da redução, um filtro de vizinhança atenua variações pequenas
+de cor e limita a mistura através de bordas de alto contraste. Depois de agrupar
+os tons na paleta, ele remove apenas pontos isolados de baixo contraste cercados
+por uma região opaca quase uniforme (com dithering desligado). Linhas conectadas,
+brilhos fortes e pixels junto à transparência não passam por essa limpeza final.
+A limpeza também considera ilhas completas de 2×2 pixels de baixo contraste,
+somente quando cercadas por uma única cor opaca e sem conexões diagonais.
+A votação mantém cores exatas da paleta e desempata de forma estável.
+A análise usa uma resolução intermediária limitada e não é aplicada em tamanho
+nativo. Trata-se de processamento local de cores e vizinhança, sem IA semântica.
+Pode suavizar pequenos detalhes de baixo contraste: compare os dois modos.
+
+Em **Amostragem**, escolha **pixel art limpa** para reduzir ilustrações grandes.
+Esse modo reúne os tons na paleta escolhida antes de selecionar a cor dominante
+de cada pixel de saída. Assim, variações próximas da mesma cor não dividem seus
+votos e não favorecem pequenos pontos de outra cor. É o padrão de novos perfis
+de personagem e objeto; receitas salvas mantêm sua opção anterior.
+
+Use dithering **nenhum** para áreas de cor uniformes. A paleta continua importante:
+cores ausentes nela serão substituídas. A redução não redesenha contornos nem
+recupera detalhes menores que um pixel de saída; compare também um tamanho maior.
+Os modos média e dominante agora ponderam a área exata de cada pixel de origem,
+inclusive em reduções com proporções fracionárias.
