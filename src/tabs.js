@@ -15,7 +15,7 @@
   var items = [];
   var sheet = {
     mode: 'grid', width: 512, height: 512, cell: 32, baseline: 480,
-    snap: true, placements: []
+    snap: true, placements: [], filter: { preset: 'none', brightness: 0, contrast: 0 }
   };
   var savedSheets = [];
   var selected = null;
@@ -197,22 +197,10 @@
   /* ---------------------------------------------------------------- abas */
 
   function switchTab(name) {
-    if (name !== '3d' && PF.scene3d) PF.scene3d.leave();
-    var layout = $('tab-sprite') && $('tab-sprite').querySelector('.layout');
-    if (name === '3d') {
-      // A aba 3D foi adicionada ao layout clássico: mantenha o contêiner pai
-      // visível e oculte somente as três colunas da aba Sprite.
-      $('tab-sprite').classList.remove('hidden');
-      if (layout) layout.classList.add('scene-active');
-      $('tab-3d').classList.remove('hidden');
-      ['library', 'sheet', 'shadow', 'lighting'].forEach(function (t) { $('tab-' + t).classList.add('hidden'); });
-    } else {
-      if (layout) layout.classList.remove('scene-active');
-      ['sprite', 'library', 'sheet', 'shadow', 'lighting', '3d'].forEach(function (t) {
-        var el = $('tab-' + t);
-        if (el) el.classList.toggle('hidden', t !== name);
-      });
-    }
+    ['sprite', 'library', 'sheet', 'shadow', 'lighting'].forEach(function (t) {
+      var el = $('tab-' + t);
+      if (el) el.classList.toggle('hidden', t !== name);
+    });
     Array.prototype.forEach.call($('tabs').children, function (b) {
       b.classList.toggle('active', b.dataset.tab === name);
     });
@@ -222,7 +210,6 @@
     }
     if (name === 'shadow') renderShadowTab();
     if (name === 'lighting') PF.lightingTab.render();
-    if (name === '3d' && PF.scene3d) PF.scene3d.enter();
   }
 
   /* ---------------------------------------------------------------- biblioteca */
@@ -517,6 +504,39 @@
 
   function clamped(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+  function sheetFilter() {
+    if (!sheet.filter) sheet.filter = { preset: 'none', brightness: 0, contrast: 0 };
+    return sheet.filter;
+  }
+
+  function filteredColor(c) {
+    if (!c || c.a === 0) return c;
+    var f = sheetFilter(), r = c.r, g = c.g, b = c.b;
+    if (f.preset === 'grayscale') { var gray = Math.round(r * 0.299 + g * 0.587 + b * 0.114); r = g = b = gray; }
+    if (f.preset === 'sepia') { var or = r, og = g, ob = b; r = or * .393 + og * .769 + ob * .189; g = or * .349 + og * .686 + ob * .168; b = or * .272 + og * .534 + ob * .131; }
+    if (f.preset === 'invert') { r = 255 - r; g = 255 - g; b = 255 - b; }
+    var bright = Number(f.brightness) || 0, contrast = 1 + (Number(f.contrast) || 0) / 100;
+    return { r: clamped(Math.round((r - 128) * contrast + 128 + bright), 0, 255), g: clamped(Math.round((g - 128) * contrast + 128 + bright), 0, 255), b: clamped(Math.round((b - 128) * contrast + 128 + bright), 0, 255), a: c.a };
+  }
+
+  function applyPreviewFilter(ctx, width, height) {
+    var f = sheetFilter();
+    if (f.preset === 'none' && !f.brightness && !f.contrast) return;
+    var data = ctx.getImageData(0, 0, width, height);
+    for (var i = 0; i < data.data.length; i += 4) {
+      if (!data.data[i + 3]) continue;
+      var c = filteredColor({ r: data.data[i], g: data.data[i + 1], b: data.data[i + 2], a: data.data[i + 3] });
+      data.data[i] = c.r; data.data[i + 1] = c.g; data.data[i + 2] = c.b;
+    }
+    ctx.putImageData(data, 0, 0);
+  }
+
+  function filteredCompose(composed) {
+    var copy = { width: composed.width, height: composed.height, indices: composed.indices, transparentIndex: composed.transparentIndex, outlineIndex: composed.outlineIndex,
+      palette: composed.palette.map(filteredColor) };
+    return copy;
+  }
+
   function snapValue(v, isY) {
     if (!sheet.snap) return Math.round(v);
     if (sheet.mode === 'grid') return Math.round(v / sheet.cell) * sheet.cell;
@@ -553,6 +573,7 @@
       var c = assetCanvas(findItem(p.assetId));
       ctx.drawImage(c, p.x * z, p.y * z, c.width * z, c.height * z);
     }
+    applyPreviewFilter(ctx, dw, dh);
 
     if (sheet.mode === 'grid') {
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -669,7 +690,7 @@
     var list = resolvePlacements();
     var composed;
     try {
-      composed = PF.composeSheet(sheet.width, sheet.height, list);
+      composed = filteredCompose(PF.composeSheet(sheet.width, sheet.height, list));
     } catch (e) {
       $('sheetVerdict').textContent = 'ERRO';
       $('sheetVerdict').className = 'verdict fail';
@@ -1236,6 +1257,12 @@
     $('sheetCell').value = sheet.cell;
     $('sheetBaseline').value = sheet.baseline;
     $('sheetSnap').checked = !!sheet.snap;
+    var filter = sheetFilter();
+    $('sheetFilterPreset').value = filter.preset;
+    $('sheetBrightness').value = filter.brightness;
+    $('sheetContrast').value = filter.contrast;
+    $('sheetBrightnessVal').textContent = filter.brightness;
+    $('sheetContrastVal').textContent = filter.contrast;
     Array.prototype.forEach.call($('sheetMode').children, function (b) {
       b.classList.toggle('active', b.dataset.mode === sheet.mode);
     });
@@ -1360,6 +1387,19 @@
     });
 
     $('sheetSnap').addEventListener('change', function (e) { sheet.snap = e.target.checked; saveSheet(); });
+    $('sheetFilterPreset').addEventListener('change', function (e) {
+      sheetFilter().preset = e.target.value;
+      renderAll(); saveSheet();
+    });
+    ['sheetBrightness', 'sheetContrast'].forEach(function (id) {
+      $(id).addEventListener('input', function (e) {
+        var key = id === 'sheetBrightness' ? 'brightness' : 'contrast';
+        sheetFilter()[key] = clamped(parseInt(e.target.value, 10) || 0, -100, 100);
+        $('sheetBrightnessVal').textContent = sheetFilter().brightness;
+        $('sheetContrastVal').textContent = sheetFilter().contrast;
+        renderSheet(); validateNow(); saveSheet();
+      });
+    });
     $('sheetClear').addEventListener('click', function () {
       sheet.placements = [];
       selected = null;
@@ -1498,7 +1538,6 @@
     bind();
     bindSheet();
     bindShadow();
-    if (PF.scene3d) PF.scene3d.init();
     applySheetControls();
     applyShadowControls();
     return loadFromStore();
@@ -1512,7 +1551,6 @@
     anchorId: function () { return anchorId; },
     render: function () { renderAll(); },
     markDirty: markDirty,
-    state: function () { return { items: items, sheet: sheet }; },
-    sceneAssets: function () { return items.map(function (it) { return { id: it.id, name: it.name, asset: it.result.asset }; }); }
+    state: function () { return { items: items, sheet: sheet, sheets: savedSheets }; }
   };
 })(typeof self !== 'undefined' ? self : this);

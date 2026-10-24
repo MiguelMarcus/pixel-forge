@@ -1725,7 +1725,6 @@
       getContract: function () { return state.contract; },
       restoreProject: restoreProject
     });
-    if (PF.scene3d) PF.scene3d.connect({ getEditor: function () { return state.result ? { asset: state.result.asset, name: safeName() } : null; }, getAssets: function () { return PF.tabs.sceneAssets(); }, toast: toast });
 
     $('gridToggle').classList.add('active');
     $('compareToggle').classList.add('active');
