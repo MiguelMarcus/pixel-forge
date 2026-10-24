@@ -20,6 +20,7 @@
     <button class="tab-btn" data-tab="sheet" type="button">Folha</button>
     <button class="tab-btn" data-tab="shadow" type="button">Sombra</button>
     <button class="tab-btn" data-tab="lighting" type="button">Relevo e luz</button>
+    <button class="tab-btn" data-tab="3d" type="button">3D</button>
   </nav>
   <div class="topbar-hint">Arraste uma imagem, cole com <kbd>Ctrl</kbd>+<kbd>V</kbd>, ou use um exemplo</div>
 </header>
@@ -276,6 +277,28 @@
     <div class="stage-foot">
       <span id="footLeft">pipeline determinístico · roda do mouse = zoom</span>
       <span id="footRight"></span>
+    </div>
+  </section>
+
+  <section class="tab-panel hidden" id="tab-3d">
+    <div class="scene3d">
+      <aside class="scene3d-side">
+        <section class="panel"><h2>Objeto</h2>
+          <label class="field"><span>Forma</span><select id="sceneShape"><option value="card">Plano vertical</option><option value="ground">Plano no chão</option><option value="cube">Cubo</option><option value="box">Caixa</option></select></label>
+          <label class="field"><span>Origem</span><select id="sceneSource"><option value="editor">Sprite atual</option></select></label>
+          <label class="field"><span>Preset</span><select id="scenePreset"><option value="pixel">Pixel nítido</option><option value="lowpoly">Low poly</option><option value="ps1">PS1 (visual)</option></select></label>
+        </section>
+        <section class="panel"><h2>Material e textura</h2>
+          <label class="field"><span>Filtro</span><select id="sceneFilter"><option value="nearest">Nearest</option><option value="linear">Linear</option></select></label>
+          <div class="row"><label class="mini grow">Repetição U</label><input class="num sm" id="sceneRepeatU" type="number" min="1" max="8" value="1"></div>
+          <div class="row"><label class="mini grow">Repetição V</label><input class="num sm" id="sceneRepeatV" type="number" min="1" max="8" value="1"></div>
+          <label class="check"><input id="sceneAlpha" type="checkbox" checked><span>Usar transparência</span></label>
+          <label class="field"><span>Resolução PS1</span><select id="sceneResolution"><option value="source">Original</option><option value="64">64 px</option><option value="32">32 px</option><option value="16">16 px</option></select></label>
+          <p class="export-note" id="sceneMaterialNote">Textura RGBA derivada do sprite conformado.</p>
+        </section>
+        <section class="panel"><h2>Exportação</h2><button class="btn primary block" id="sceneExport" type="button" disabled>Exportar GLB</button><button class="btn ghost block sm" id="scenePng" type="button" disabled>PNG da textura</button><button class="btn ghost block sm" id="sceneRecipe" type="button" disabled>Receita JSON</button><input id="sceneGlbInput" type="file" accept=".glb,model/gltf-binary" hidden><button class="btn ghost block sm" id="sceneOpenGlb" type="button">Abrir GLB para validar</button><p class="export-note">O arquivo é relido nesta prévia antes do download.</p></section>
+      </aside>
+      <div class="scene3d-main"><div class="stage-head"><div><b id="sceneStatus">Nenhum objeto</b><span class="stage-sub" id="sceneDimensions"></span></div><div class="stage-tools"><button class="btn ghost sm" id="sceneReset" type="button">Centralizar</button></div></div><div class="scene3d-view"><canvas id="sceneCanvas" aria-label="Prévia 3D; arraste para orbitar e use a roda para zoom"></canvas><div id="sceneEmpty" class="empty">Abra uma imagem ou escolha um asset na Biblioteca.</div></div><div class="scene3d-strip"><span id="sceneThumb" class="scene-thumb">▣</span><span id="sceneAssetName">Sem asset de origem</span><span id="sceneRecipeStatus">Receita não salva</span></div></div>
     </div>
   </section>
 
@@ -690,6 +713,7 @@
 <script src="src/lighting-tab.js"></script>
 <script src="src/library.js"></script>
 <script src="src/tabs.js"></script>
+<script src="src/scene3d.js"></script>
 <script src="src/segmentation.js"></script>
 <script src="src/app.js"></script>
 </body>

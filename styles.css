@@ -729,6 +729,20 @@ input[type="range"]::-moz-range-thumb {
   background: #232a3a;
   color: var(--muted);
 }
+
+/* Bancada 3D */
+.scene3d { display:grid; grid-template-columns:280px minmax(0,1fr); height:100%; }
+.scene3d-side { overflow-y:auto; padding:14px; border-right:1px solid var(--line); }
+.scene3d-side .panel { margin-bottom:10px; }
+.scene3d-main { min-width:0; display:flex; flex-direction:column; padding:14px; }
+.scene3d-view { position:relative; flex:1; min-height:280px; overflow:hidden; border:1px solid var(--line); border-radius:9px; background:#0e1118; }
+#sceneCanvas { display:block; width:100%; height:100%; touch-action:none; }
+.scene3d-view .empty { position:absolute; inset:0; pointer-events:none; }
+.scene3d-strip { display:flex; align-items:center; gap:12px; padding:10px 2px; color:var(--muted); font-size:11px; }
+.scene3d-strip #sceneRecipeStatus { margin-left:auto; font-family:var(--mono); color:var(--dim); }
+.scene-thumb { width:40px; height:40px; display:grid; place-items:center; border-radius:5px; background:#0c0f15; overflow:hidden; }
+.scene-thumb img { max-width:100%; max-height:100%; image-rendering:pixelated; object-fit:contain; }
+@media(max-width:860px){.scene3d{display:flex;flex-direction:column;height:auto}.scene3d-side{order:2;border:0;padding:10px}.scene3d-main{height:65vh;min-height:400px}.scene3d-view{min-height:300px}}
 .tab-btn.active .tab-count { background: rgba(125, 240, 192, 0.16); color: var(--accent); }
 
 /* ---------------------------------------------------------------- biblioteca */

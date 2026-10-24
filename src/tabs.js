@@ -196,7 +196,8 @@
   /* ---------------------------------------------------------------- abas */
 
   function switchTab(name) {
-    ['sprite', 'library', 'sheet', 'shadow', 'lighting'].forEach(function (t) {
+    if (name !== '3d' && PF.scene3d) PF.scene3d.leave();
+    ['sprite', 'library', 'sheet', 'shadow', 'lighting', '3d'].forEach(function (t) {
       var el = $('tab-' + t);
       if (el) el.classList.toggle('hidden', t !== name);
     });
@@ -209,6 +210,7 @@
     }
     if (name === 'shadow') renderShadowTab();
     if (name === 'lighting') PF.lightingTab.render();
+    if (name === '3d' && PF.scene3d) PF.scene3d.enter();
   }
 
   /* ---------------------------------------------------------------- biblioteca */
@@ -1411,6 +1413,7 @@
     bind();
     bindSheet();
     bindShadow();
+    if (PF.scene3d) PF.scene3d.init();
     applySheetControls();
     applyShadowControls();
     return loadFromStore();
@@ -1424,6 +1427,7 @@
     anchorId: function () { return anchorId; },
     render: function () { renderAll(); },
     markDirty: markDirty,
-    state: function () { return { items: items, sheet: sheet }; }
+    state: function () { return { items: items, sheet: sheet }; },
+    sceneAssets: function () { return items.map(function (it) { return { id: it.id, name: it.name, asset: it.result.asset }; }); }
   };
 })(typeof self !== 'undefined' ? self : this);
