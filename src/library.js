@@ -168,6 +168,7 @@
       anchorId: state.anchorId || null,
       shadow: state.shadow || null,
       lighting: state.lighting || null,
+      sheets: state.sheets || [],
       editor: state.editor ? {
         name: state.editor.name, profile: state.editor.profile,
         params: state.editor.params, contract: state.editor.contract,
@@ -225,6 +226,17 @@
         !Array.isArray(s.placements) || !s.placements.every(function (p) {
           return p && ids.has(p.assetId) && Number.isInteger(p.x) && Number.isInteger(p.y);
         })) throw new Error('layout da folha inválido');
+    }
+    if (data.sheets != null) {
+      if (!Array.isArray(data.sheets) || !data.sheets.every(function (entry) {
+        var s = entry && entry.sheet;
+        return typeof entry.id === 'string' && typeof entry.name === 'string' && s &&
+          positiveInt(s.width, 2048) && positiveInt(s.height, 2048) && positiveInt(s.cell, 256) &&
+          ['grid', 'ruler'].indexOf(s.mode) !== -1 && Number.isFinite(s.baseline) && s.baseline >= 0 &&
+          Array.isArray(s.placements) && s.placements.every(function (p) {
+            return p && ids.has(p.assetId) && Number.isInteger(p.x) && Number.isInteger(p.y);
+          });
+      })) throw new Error('biblioteca de folhas inválida');
     }
     if (data.anchorId && !ids.has(data.anchorId)) throw new Error('âncora não encontrada');
     if (data.lighting != null && (typeof data.lighting !== 'object' || Array.isArray(data.lighting))) throw new Error('configuração de relevo inválida');

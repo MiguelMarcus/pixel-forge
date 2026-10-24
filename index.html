@@ -392,6 +392,12 @@
 
       <div class="lib-grid" id="libGrid"></div>
 
+      <section class="saved-sheets" aria-labelledby="savedSheetsTitle">
+        <div class="library-head saved-sheets-head"><div><div class="lib-title" id="savedSheetsTitle">Folhas salvas</div><div class="lib-sub" id="savedSheetsTotal">0 folhas</div></div></div>
+        <div class="saved-sheets-grid" id="savedSheetsGrid"></div>
+        <p class="lib-empty hidden" id="savedSheetsEmpty">Salve uma montagem na aba Folha para ela aparecer aqui.</p>
+      </section>
+
       <div class="lib-empty" id="libEmpty">
         <div class="empty-mark">▤</div>
         <p>Biblioteca vazia.</p>
@@ -492,6 +498,7 @@
 
         <section class="panel">
           <h2>Exportar folha</h2>
+          <button class="btn ghost block sm" id="sheetSaveLibrary" type="button" disabled>Salvar na biblioteca</button>
           <button class="btn primary block" id="sheetExportPng" type="button" disabled>PNG indexado</button>
           <div class="export-grid">
             <button class="btn ghost" id="sheetExportJson" type="button" disabled>JSON de frames</button>

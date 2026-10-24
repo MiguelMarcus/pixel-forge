@@ -17,6 +17,7 @@
     mode: 'grid', width: 512, height: 512, cell: 32, baseline: 480,
     snap: true, placements: []
   };
+  var savedSheets = [];
   var selected = null;
   var activeAssetId = null;
   var sheetZoom = 'fit';
@@ -197,10 +198,21 @@
 
   function switchTab(name) {
     if (name !== '3d' && PF.scene3d) PF.scene3d.leave();
-    ['sprite', 'library', 'sheet', 'shadow', 'lighting', '3d'].forEach(function (t) {
-      var el = $('tab-' + t);
-      if (el) el.classList.toggle('hidden', t !== name);
-    });
+    var layout = $('tab-sprite') && $('tab-sprite').querySelector('.layout');
+    if (name === '3d') {
+      // A aba 3D foi adicionada ao layout clássico: mantenha o contêiner pai
+      // visível e oculte somente as três colunas da aba Sprite.
+      $('tab-sprite').classList.remove('hidden');
+      if (layout) layout.classList.add('scene-active');
+      $('tab-3d').classList.remove('hidden');
+      ['library', 'sheet', 'shadow', 'lighting'].forEach(function (t) { $('tab-' + t).classList.add('hidden'); });
+    } else {
+      if (layout) layout.classList.remove('scene-active');
+      ['sprite', 'library', 'sheet', 'shadow', 'lighting', '3d'].forEach(function (t) {
+        var el = $('tab-' + t);
+        if (el) el.classList.toggle('hidden', t !== name);
+      });
+    }
     Array.prototype.forEach.call($('tabs').children, function (b) {
       b.classList.toggle('active', b.dataset.tab === name);
     });
@@ -376,6 +388,67 @@
       (dirty ? ' · não salvo' : '') +
       (anchorItem ? ' · âncora: ' + anchorItem.name : '');
     $('projNote').textContent = items.length + (items.length === 1 ? ' asset salvo' : ' assets salvos');
+    renderSavedSheets();
+  }
+
+  function sheetThumb(record) {
+    var previous = sheet;
+    try {
+      sheet = record.sheet;
+      var composed = PF.composeSheet(sheet.width, sheet.height, resolvePlacements());
+      var c = document.createElement('canvas'); c.width = composed.width; c.height = composed.height;
+      var ctx = c.getContext('2d'), image = ctx.createImageData(c.width, c.height), rgba = PF.toRGBA(composed);
+      image.data.set(rgba.data); ctx.putImageData(image, 0, 0);
+      return c.toDataURL('image/png');
+    } catch (e) { return ''; } finally { sheet = previous; }
+  }
+
+  function persistSavedSheets() {
+    dirty = true;
+    persist(deps.store.putMeta('savedSheets', clone(savedSheets)));
+  }
+
+  function openSavedSheet(id) {
+    var found = savedSheets.filter(function (entry) { return entry.id === id; })[0];
+    if (!found) return;
+    sheet = clone(found.sheet);
+    sheet.placements = sheet.placements.filter(function (p) { return !!findItem(p.assetId); });
+    selected = null;
+    applySheetControls();
+    saveSheet();
+    switchTab('sheet');
+    toast('Folha “' + found.name + '” aberta.');
+  }
+
+  function renderSavedSheets() {
+    var grid = $('savedSheetsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    $('savedSheetsEmpty').classList.toggle('hidden', savedSheets.length > 0);
+    $('savedSheetsTotal').textContent = savedSheets.length + (savedSheets.length === 1 ? ' folha' : ' folhas');
+    savedSheets.forEach(function (entry) {
+      var card = document.createElement('div'); card.className = 'saved-sheet-card';
+      var img = document.createElement('img'); img.alt = 'Miniatura da folha ' + entry.name; img.src = sheetThumb(entry);
+      var name = document.createElement('div'); name.className = 'lib-name'; name.textContent = entry.name; name.title = entry.name;
+      var meta = document.createElement('div'); meta.className = 'lib-meta'; meta.textContent = entry.sheet.width + '×' + entry.sheet.height + ' · ' + entry.sheet.placements.length + ' sprites';
+      var row = document.createElement('div'); row.className = 'row';
+      var open = document.createElement('button'); open.type = 'button'; open.className = 'btn ghost'; open.textContent = 'abrir'; open.addEventListener('click', function () { openSavedSheet(entry.id); });
+      var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn ghost'; remove.textContent = 'excluir'; remove.addEventListener('click', function () { savedSheets = savedSheets.filter(function (x) { return x.id !== entry.id; }); persistSavedSheets(); renderLibrary(); });
+      row.appendChild(open); row.appendChild(remove); card.appendChild(img); card.appendChild(name); card.appendChild(meta); card.appendChild(row); grid.appendChild(card);
+    });
+  }
+
+  function saveCurrentSheet() {
+    var out = validateNow();
+    if (!out || !out.list.length) { toast('Adicione ao menos um sprite antes de salvar a folha.'); return; }
+    var suggested = baseName();
+    var name = typeof window.prompt === 'function' ? window.prompt('Nome da folha', suggested) : suggested;
+    if (name === null) return;
+    name = String(name || suggested).trim() || suggested;
+    savedSheets.push({ id: PF.library.newId(), name: name, savedAt: new Date().toISOString(), sheet: clone(sheet) });
+    persistSavedSheets();
+    renderLibrary();
+    toast('Folha salva na Biblioteca.');
   }
 
   function setAnchor(id) {
@@ -644,6 +717,7 @@
     $('sheetExportPng').disabled = !list.length;
     $('sheetExportJson').disabled = !list.length;
     $('sheetExportAseprite').disabled = !list.length;
+    $('sheetSaveLibrary').disabled = !list.length;
     $('sheetNote').textContent = list.length
       ? (composed.palette.length - 1) + ' cores na união · ' + list.length + ' sprites'
       : 'A folha tem paleta única (união das paletas) e sai indexada, como os sprites.';
@@ -1132,6 +1206,12 @@
       return deps.store.getMeta('anchor');
     }).then(function (savedAnchor) {
       anchorId = savedAnchor || null;
+      return deps.store.getMeta('savedSheets');
+    }).then(function (storedSheets) {
+      savedSheets = Array.isArray(storedSheets) ? storedSheets.filter(function (entry) {
+        return entry && entry.id && entry.name && entry.sheet && Array.isArray(entry.sheet.placements) &&
+          entry.sheet.placements.every(function (p) { return findItem(p.assetId); });
+      }) : [];
       return deps.store.getMeta('sheet');
     }).then(function (saved) {
       if (saved && saved.placements) sheet = saved;
@@ -1184,8 +1264,10 @@
         !window.confirm('Esvaziar a biblioteca? Não dá para recuperar.')) return;
       items = [];
       sheet.placements = [];
+      savedSheets = [];
       selected = null;
       persist(deps.store.clear());
+      persist(deps.store.putMeta('savedSheets', []));
       saveSheet();
       dirty = true;
       renderAll();
@@ -1198,6 +1280,7 @@
         profile: deps.getProfile(),
         contract: deps.getContract(),
         sheet: sheet,
+        sheets: savedSheets,
         anchorId: anchorId,
         shadow: shadow,
         lighting: PF.lightingTab.settings(),
@@ -1318,6 +1401,7 @@
     $('sheetExportPng').addEventListener('click', exportSheetPng);
     $('sheetExportJson').addEventListener('click', exportSheetJson);
     $('sheetExportAseprite').addEventListener('click', exportSheetAseprite);
+    $('sheetSaveLibrary').addEventListener('click', saveCurrentSheet);
 
     window.addEventListener('resize', function () {
       clearTimeout(window.__pfResizeAll);
@@ -1367,12 +1451,13 @@
       return Promise.all(pendingWrites.slice());
     }).then(function () {
       return deps.store.replace(incoming.map(serialize), {
-        sheet: incomingSheet, shadow: incomingShadow, lighting: incomingLighting, editor: data.editor || null,
+        sheet: incomingSheet, savedSheets: data.sheets || [], shadow: incomingShadow, lighting: incomingLighting, editor: data.editor || null,
         anchor: data.anchorId || null, project: settings
       });
     }).then(function () {
       items = incoming;
       sheet = incomingSheet;
+      savedSheets = data.sheets || [];
       shadow = incomingShadow;
       anchorId = data.anchorId || null;
       selected = null;
