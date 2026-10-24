@@ -294,6 +294,7 @@
           <div class="row"><label class="mini grow">Repetição V</label><input class="num sm" id="sceneRepeatV" type="number" min="1" max="8" value="1"></div>
           <label class="check"><input id="sceneAlpha" type="checkbox" checked><span>Usar transparência</span></label>
           <label class="field"><span>Resolução PS1</span><select id="sceneResolution"><option value="source">Original</option><option value="64">64 px</option><option value="32">32 px</option><option value="16">16 px</option></select></label>
+          <div id="sceneFacePanel" class="scene-faces hidden"><p class="mini">Textura por face (caixa)</p><div class="scene-face-grid"></div></div>
           <p class="export-note" id="sceneMaterialNote">Textura RGBA derivada do sprite conformado.</p>
         </section>
         <section class="panel"><h2>Exportação</h2><button class="btn primary block" id="sceneExport" type="button" disabled>Exportar GLB</button><button class="btn ghost block sm" id="scenePng" type="button" disabled>PNG da textura</button><button class="btn ghost block sm" id="sceneRecipe" type="button" disabled>Receita JSON</button><input id="sceneGlbInput" type="file" accept=".glb,model/gltf-binary" hidden><button class="btn ghost block sm" id="sceneOpenGlb" type="button">Abrir GLB para validar</button><p class="export-note">O arquivo é relido nesta prévia antes do download.</p></section>

@@ -742,6 +742,10 @@ input[type="range"]::-moz-range-thumb {
 .scene3d-strip #sceneRecipeStatus { margin-left:auto; font-family:var(--mono); color:var(--dim); }
 .scene-thumb { width:40px; height:40px; display:grid; place-items:center; border-radius:5px; background:#0c0f15; overflow:hidden; }
 .scene-thumb img { max-width:100%; max-height:100%; image-rendering:pixelated; object-fit:contain; }
+.scene-face-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.scene-face-grid label { font-size:10px; color:var(--muted); }
+.scene-face-grid label.scene-face { display:flex; flex-direction:column; gap:3px; }
+.scene-face-grid select { width:100%; min-width:0; padding:5px; }
 @media(max-width:860px){.scene3d{display:flex;flex-direction:column;height:auto}.scene3d-side{order:2;border:0;padding:10px}.scene3d-main{height:65vh;min-height:400px}.scene3d-view{min-height:300px}}
 .tab-btn.active .tab-count { background: rgba(125, 240, 192, 0.16); color: var(--accent); }
 
