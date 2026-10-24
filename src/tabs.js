@@ -15,7 +15,7 @@
   var items = [];
   var sheet = {
     mode: 'grid', width: 512, height: 512, cell: 32, baseline: 480,
-    snap: true, placements: [], filter: { preset: 'none', brightness: 0, contrast: 0 }
+    snap: true, placements: [], filter: { preset: 'none', brightness: 0, contrast: 0, normalize: 'off' }
   };
   var savedSheets = [];
   var selected = null;
@@ -197,10 +197,19 @@
   /* ---------------------------------------------------------------- abas */
 
   function switchTab(name) {
-    ['sprite', 'library', 'sheet', 'shadow', 'lighting'].forEach(function (t) {
+    var layout = $('tab-sprite') && $('tab-sprite').querySelector('.layout');
+    if (name === 'treatment') {
+      $('tab-sprite').classList.remove('hidden');
+      if (layout) layout.classList.add('treatment-active');
+      $('tab-treatment').classList.remove('hidden');
+      ['library', 'sheet', 'shadow', 'lighting'].forEach(function (t) { $('tab-' + t).classList.add('hidden'); });
+    } else {
+      if (layout) layout.classList.remove('treatment-active');
+      ['sprite', 'library', 'sheet', 'shadow', 'lighting', 'treatment'].forEach(function (t) {
       var el = $('tab-' + t);
       if (el) el.classList.toggle('hidden', t !== name);
-    });
+      });
+    }
     Array.prototype.forEach.call($('tabs').children, function (b) {
       b.classList.toggle('active', b.dataset.tab === name);
     });
@@ -210,6 +219,7 @@
     }
     if (name === 'shadow') renderShadowTab();
     if (name === 'lighting') PF.lightingTab.render();
+    if (name === 'treatment' && PF.treatmentTab) PF.treatmentTab.render();
   }
 
   /* ---------------------------------------------------------------- biblioteca */
@@ -505,7 +515,8 @@
   function clamped(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
   function sheetFilter() {
-    if (!sheet.filter) sheet.filter = { preset: 'none', brightness: 0, contrast: 0 };
+    if (!sheet.filter) sheet.filter = { preset: 'none', brightness: 0, contrast: 0, normalize: 'off' };
+    if (!sheet.filter.normalize) sheet.filter.normalize = 'off';
     return sheet.filter;
   }
 
@@ -516,12 +527,20 @@
     if (f.preset === 'sepia') { var or = r, og = g, ob = b; r = or * .393 + og * .769 + ob * .189; g = or * .349 + og * .686 + ob * .168; b = or * .272 + og * .534 + ob * .131; }
     if (f.preset === 'invert') { r = 255 - r; g = 255 - g; b = 255 - b; }
     var bright = Number(f.brightness) || 0, contrast = 1 + (Number(f.contrast) || 0) / 100;
-    return { r: clamped(Math.round((r - 128) * contrast + 128 + bright), 0, 255), g: clamped(Math.round((g - 128) * contrast + 128 + bright), 0, 255), b: clamped(Math.round((b - 128) * contrast + 128 + bright), 0, 255), a: c.a };
+    r = clamped(Math.round((r - 128) * contrast + 128 + bright), 0, 255);
+    g = clamped(Math.round((g - 128) * contrast + 128 + bright), 0, 255);
+    b = clamped(Math.round((b - 128) * contrast + 128 + bright), 0, 255);
+    if (f.normalize !== 'off') {
+      var levels = f.normalize === 'bw' ? 2 : parseInt(f.normalize, 10) || 4;
+      var neutral = clamped(Math.round((r * .299 + g * .587 + b * .114) / 255 * (levels - 1)) * 255 / (levels - 1));
+      r = g = b = neutral;
+    }
+    return { r: r, g: g, b: b, a: c.a };
   }
 
   function applyPreviewFilter(ctx, width, height) {
     var f = sheetFilter();
-    if (f.preset === 'none' && !f.brightness && !f.contrast) return;
+    if (f.preset === 'none' && !f.brightness && !f.contrast && f.normalize === 'off') return;
     var data = ctx.getImageData(0, 0, width, height);
     for (var i = 0; i < data.data.length; i += 4) {
       if (!data.data[i + 3]) continue;
@@ -532,9 +551,14 @@
   }
 
   function filteredCompose(composed) {
-    var copy = { width: composed.width, height: composed.height, indices: composed.indices, transparentIndex: composed.transparentIndex, outlineIndex: composed.outlineIndex,
-      palette: composed.palette.map(filteredColor) };
-    return copy;
+    var palette = [], map = new Map(), remap = [], indices = new Uint8Array(composed.indices.length);
+    composed.palette.forEach(function (color, index) {
+      var c = filteredColor(color), key = c.r + ',' + c.g + ',' + c.b + ',' + c.a, next = map.get(key);
+      if (next === undefined) { next = palette.length; palette.push(c); map.set(key, next); }
+      remap[index] = next;
+    });
+    for (var i = 0; i < indices.length; i++) indices[i] = remap[composed.indices[i]];
+    return { width: composed.width, height: composed.height, indices: indices, transparentIndex: remap[composed.transparentIndex], outlineIndex: -1, palette: palette };
   }
 
   function snapValue(v, isY) {
@@ -1259,6 +1283,7 @@
     $('sheetSnap').checked = !!sheet.snap;
     var filter = sheetFilter();
     $('sheetFilterPreset').value = filter.preset;
+    $('sheetNormalize').value = filter.normalize;
     $('sheetBrightness').value = filter.brightness;
     $('sheetContrast').value = filter.contrast;
     $('sheetBrightnessVal').textContent = filter.brightness;
@@ -1389,6 +1414,10 @@
     $('sheetSnap').addEventListener('change', function (e) { sheet.snap = e.target.checked; saveSheet(); });
     $('sheetFilterPreset').addEventListener('change', function (e) {
       sheetFilter().preset = e.target.value;
+      renderAll(); saveSheet();
+    });
+    $('sheetNormalize').addEventListener('change', function (e) {
+      sheetFilter().normalize = e.target.value;
       renderAll(); saveSheet();
     });
     ['sheetBrightness', 'sheetContrast'].forEach(function (id) {

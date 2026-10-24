@@ -29,6 +29,7 @@
     appliedZoom: 1,
     showGrid: true,
     compare: true,
+    compareMode: 'overlay',
     split: 0.5,
     params: INITIAL_PARAMS,
     contract: PF.profileContract('character')
@@ -532,7 +533,7 @@
     var dw = a.width * z;
     var dh = a.height * z;
     var wrap = $('canvasWrap');
-    wrap.style.width = dw + 'px';
+    wrap.style.width = (state.compareMode === 'side' ? dw * 2 : dw) + 'px';
     wrap.style.height = dh + 'px';
 
     var out = $('outCanvas');
@@ -549,6 +550,7 @@
 
   function setSplit(v) {
     state.split = Math.max(0, Math.min(1, v));
+    if (state.compareMode === 'side') return;
     $('divider').style.left = (state.split * 100) + '%';
     $('srcClip').style.width = (state.split * 100) + '%';
   }
@@ -556,11 +558,20 @@
   function setCompare(on) {
     state.compare = on;
     $('srcClip').classList.toggle('hidden', !on);
-    $('divider').classList.toggle('hidden-div', !on);
+    $('divider').classList.toggle('hidden-div', !on || state.compareMode === 'side');
     var bl = $('badgeL'), br = $('badgeR');
     if (bl) bl.classList.toggle('hidden', !on);
     if (br) br.classList.toggle('hidden', !on);
     $('compareToggle').classList.toggle('active', on);
+  }
+
+  function setCompareMode(mode) {
+    state.compareMode = mode === 'side' ? 'side' : 'overlay';
+    $('compare').classList.toggle('side-by-side', state.compareMode === 'side');
+    $('compareMode').classList.toggle('active', state.compareMode === 'side');
+    $('compareMode').textContent = state.compareMode === 'side' ? 'sobrepor' : 'lado a lado';
+    $('divider').classList.toggle('hidden-div', !state.compare || state.compareMode === 'side');
+    if (state.result) applyZoom();
   }
 
   function renderChecks(result) {
@@ -1648,6 +1659,7 @@
     $('compareToggle').addEventListener('click', function () {
       setCompare(!state.compare);
     });
+    $('compareMode').addEventListener('click', function () { setCompareMode(state.compareMode === 'side' ? 'overlay' : 'side'); });
 
     var wrap = $('canvasWrap');
     var dragging = false;
@@ -1725,6 +1737,11 @@
       getContract: function () { return state.contract; },
       restoreProject: restoreProject
     });
+    if (PF.treatmentTab) PF.treatmentTab.init({
+      getEditor: function () { return state.result ? { asset: state.result.asset, name: safeName() } : null; },
+      sendToSprite: function (image, name) { setSource(capSource(image), name); },
+      saveBytes: saveBytes, toast: toast, switchTab: PF.tabs.switchTab
+    });
 
     $('gridToggle').classList.add('active');
     $('compareToggle').classList.add('active');
@@ -1751,6 +1768,7 @@
     wrap.appendChild(br);
 
     setCompare(true);
+    setCompareMode('overlay');
     updateExportEnabled();
 
     $('fileName').textContent = 'nenhuma imagem';
