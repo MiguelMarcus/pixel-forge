@@ -18,6 +18,7 @@
     snap: true, placements: [], filter: { preset: 'none', brightness: 0, contrast: 0, normalize: 'off' }
   };
   var savedSheets = [];
+  var currentSavedSheetId = null;
   var selected = null;
   var activeAssetId = null;
   var sheetZoom = 'fit';
@@ -409,6 +410,7 @@
     var found = savedSheets.filter(function (entry) { return entry.id === id; })[0];
     if (!found) return;
     sheet = clone(found.sheet);
+    currentSavedSheetId = found.id;
     sheet.placements = sheet.placements.filter(function (p) { return !!findItem(p.assetId); });
     selected = null;
     applySheetControls();
@@ -430,7 +432,7 @@
       var meta = document.createElement('div'); meta.className = 'lib-meta'; meta.textContent = entry.sheet.width + '×' + entry.sheet.height + ' · ' + entry.sheet.placements.length + ' sprites';
       var row = document.createElement('div'); row.className = 'row';
       var open = document.createElement('button'); open.type = 'button'; open.className = 'btn ghost'; open.textContent = 'abrir'; open.addEventListener('click', function () { openSavedSheet(entry.id); });
-      var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn ghost'; remove.textContent = 'excluir'; remove.addEventListener('click', function () { savedSheets = savedSheets.filter(function (x) { return x.id !== entry.id; }); persistSavedSheets(); renderLibrary(); });
+      var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn ghost'; remove.textContent = 'excluir'; remove.addEventListener('click', function () { savedSheets = savedSheets.filter(function (x) { return x.id !== entry.id; }); if (currentSavedSheetId === entry.id) currentSavedSheetId = null; persistSavedSheets(); renderLibrary(); applySheetSaveLabel(); });
       row.appendChild(open); row.appendChild(remove); card.appendChild(img); card.appendChild(name); card.appendChild(meta); card.appendChild(row); grid.appendChild(card);
     });
   }
@@ -438,14 +440,34 @@
   function saveCurrentSheet() {
     var out = validateNow();
     if (!out || !out.list.length) { toast('Adicione ao menos um sprite antes de salvar a folha.'); return; }
+    var existing = currentSavedSheetId && savedSheets.filter(function (entry) { return entry.id === currentSavedSheetId; })[0];
+    if (existing) {
+      existing.sheet = clone(sheet);
+      existing.updatedAt = new Date().toISOString();
+      persistSavedSheets();
+      renderLibrary();
+      applySheetSaveLabel();
+      toast('Folha “' + existing.name + '” atualizada na Biblioteca.');
+      return;
+    }
     var suggested = baseName();
     var name = typeof window.prompt === 'function' ? window.prompt('Nome da folha', suggested) : suggested;
     if (name === null) return;
     name = String(name || suggested).trim() || suggested;
-    savedSheets.push({ id: PF.library.newId(), name: name, savedAt: new Date().toISOString(), sheet: clone(sheet) });
+    var entry = { id: PF.library.newId(), name: name, savedAt: new Date().toISOString(), sheet: clone(sheet) };
+    savedSheets.push(entry);
+    currentSavedSheetId = entry.id;
     persistSavedSheets();
     renderLibrary();
     toast('Folha salva na Biblioteca.');
+  }
+
+  function applySheetSaveLabel() {
+    var button = $('sheetSaveLibrary');
+    if (!button) return;
+    var entry = currentSavedSheetId && savedSheets.filter(function (item) { return item.id === currentSavedSheetId; })[0];
+    button.textContent = entry ? 'Salvar alterações' : 'Salvar na biblioteca';
+    button.title = entry ? 'Atualiza a folha “' + entry.name + '” já aberta' : 'Cria uma nova folha na Biblioteca';
   }
 
   function setAnchor(id) {
@@ -1293,6 +1315,7 @@
     });
     $('cellRow').classList.toggle('hidden', sheet.mode !== 'grid');
     $('baselineRow').classList.toggle('hidden', sheet.mode !== 'ruler');
+    applySheetSaveLabel();
   }
 
   /* ---------------------------------------------------------------- bind */
@@ -1317,6 +1340,7 @@
       items = [];
       sheet.placements = [];
       savedSheets = [];
+      currentSavedSheetId = null;
       selected = null;
       persist(deps.store.clear());
       persist(deps.store.putMeta('savedSheets', []));
@@ -1527,6 +1551,7 @@
       items = incoming;
       sheet = incomingSheet;
       savedSheets = data.sheets || [];
+      currentSavedSheetId = null;
       shadow = incomingShadow;
       anchorId = data.anchorId || null;
       selected = null;

@@ -20,7 +20,7 @@
     <button class="tab-btn" data-tab="sheet" type="button">Folha</button>
     <button class="tab-btn" data-tab="shadow" type="button">Sombra</button>
     <button class="tab-btn" data-tab="lighting" type="button">Relevo e luz</button>
-    <button class="tab-btn" data-tab="treatment" type="button">Tratamento</button>
+    <button class="tab-btn" data-tab="treatment" type="button">Texturas</button>
   </nav>
   <div class="topbar-hint">Arraste uma imagem, cole com <kbd>Ctrl</kbd>+<kbd>V</kbd>, ou use um exemplo</div>
 </header>
@@ -287,21 +287,22 @@
   <section class="tab-panel hidden" id="tab-treatment">
     <div class="treat-layout">
       <aside class="treat-controls">
-        <section class="panel"><h2>Imagem</h2>
-          <label class="dropzone treat-drop" for="treatFile"><div class="dz-icon">▣</div><div class="dz-title">Importar imagem</div><div class="dz-sub">textura, foto ou referência</div><input id="treatFile" type="file" accept="image/*" hidden /></label>
-          <button class="btn ghost block sm" id="treatUseSprite" type="button">Usar sprite atual</button>
+        <section class="panel"><h2>Fonte da textura</h2>
+          <label class="dropzone treat-drop" for="treatFile"><div class="dz-icon">▣</div><div class="dz-title">Importar textura</div><div class="dz-sub">foto de material, albedo ou referência</div><input id="treatFile" type="file" accept="image/*" hidden /></label>
+          <button class="btn ghost block sm" id="treatUseSprite" type="button">Usar sprite como textura</button>
           <p class="export-note" id="treatSourceName">Nenhuma imagem carregada.</p>
         </section>
-        <section class="panel"><h2>Biblioteca retrô</h2>
-          <label class="field"><span>Filtro</span><select id="treatPreset"></select></label>
+        <section class="panel"><h2>Preparar textura</h2>
+          <label class="field"><span>Perfil</span><select id="treatPreset"></select></label>
+          <label class="field"><span>Mapa de saída</span><select id="treatMap"><option value="base">Cor base / albedo</option><option value="height">Mapa de altura</option><option value="roughness">Mapa de roughness</option><option value="normal">Normal map</option></select></label>
           <label class="field"><span>Pixelização</span><select id="treatPixel"><option value="1">Original</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="6">6×</option><option value="8">8×</option></select></label>
           <label class="check"><input id="treatDither" type="checkbox" /><span>Dither ordenado</span></label>
-          <label class="check"><input id="treatScanlines" type="checkbox" /><span>Scanlines</span></label>
-          <p class="export-note" id="treatNote">Filtros locais, reversíveis e sem envio de imagem.</p>
+          <label class="check"><input id="treatTile" type="checkbox" checked /><span>Prévia em repetição 3×3</span></label>
+          <p class="export-note" id="treatNote">Prepara mapas locais para material 3D; não altera a imagem-fonte.</p>
         </section>
-        <section class="panel"><h2>Saída</h2><button class="btn primary block" id="treatExport" type="button" disabled>Exportar PNG</button><button class="btn ghost block sm" id="treatSendSprite" type="button" disabled>Editar no Sprite</button></section>
+        <section class="panel"><h2>Saída</h2><button class="btn primary block" id="treatExport" type="button" disabled>Exportar textura PNG</button></section>
       </aside>
-      <section class="treat-stage"><div class="stage-head"><div class="stage-title"><span id="treatDims">—</span><span class="stage-sub" id="treatInfo"></span></div></div><div class="treat-views"><figure><figcaption>ORIGINAL</figcaption><canvas id="treatOriginal"></canvas></figure><figure><figcaption>TRATADA</figcaption><canvas id="treatOutput"></canvas></figure></div></section>
+      <section class="treat-stage"><div class="stage-head"><div class="stage-title"><span id="treatDims">—</span><span class="stage-sub" id="treatInfo"></span></div></div><div class="treat-views"><figure><figcaption>FONTE</figcaption><canvas id="treatOriginal"></canvas></figure><figure><figcaption>MAPA GERADO</figcaption><canvas id="treatOutput"></canvas></figure><figure id="treatTileWrap"><figcaption>REPETIÇÃO</figcaption><canvas id="treatTileCanvas"></canvas></figure></div></section>
     </div>
   </section>
 

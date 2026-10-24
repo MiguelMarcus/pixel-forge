@@ -35,6 +35,7 @@ body {
     radial-gradient(1200px 600px at 18% -10%, rgba(125, 240, 192, 0.06), transparent 60%),
     radial-gradient(900px 500px at 100% 0%, rgba(122, 162, 255, 0.06), transparent 55%);
   overflow: hidden;
+  background-color: #0b0d12;
 }
 
 kbd {
@@ -57,7 +58,7 @@ kbd {
   gap: 18px;
   padding: 0 18px;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 15, 20, 0.85);
+  background: rgba(11, 13, 18, 0.96);
   backdrop-filter: blur(8px);
 }
 
@@ -92,7 +93,7 @@ kbd {
 
 /* ---------------------------------------------------------------- layout */
 
-.app-main { height: calc(100vh - 52px); }
+.app-main { height: calc(100vh - 52px); background:linear-gradient(145deg, #0f1219, #0a0c11 65%); }
 
 .tab-panel { height: 100%; overflow: hidden; }
 
@@ -109,7 +110,8 @@ kbd {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  background: rgba(13, 16, 23, 0.74);
 }
 
 .left { border-right: 1px solid var(--line); }
@@ -123,10 +125,11 @@ kbd {
 /* ---------------------------------------------------------------- panels */
 
 .panel {
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: linear-gradient(180deg, #1a1f2a, #141821);
+  border: 1px solid #293142;
+  border-radius: 6px;
   padding: 12px 12px 13px;
+  box-shadow: inset 0 1px rgba(255,255,255,.025), 0 4px 16px rgba(0,0,0,.12);
 }
 
 .panel h2 {
@@ -372,6 +375,7 @@ input[type="range"]::-moz-range-thumb {
 /* ---------------------------------------------------------------- stage */
 
 .stage { display: flex; flex-direction: column; min-width: 0; }
+.stage, .treat-stage { background:rgba(12, 15, 21, .5); }
 
 .stage-head {
   height: 44px;
@@ -380,7 +384,8 @@ input[type="range"]::-moz-range-thumb {
   justify-content: space-between;
   gap: 12px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #273043;
+  background:rgba(19, 24, 33, .72);
 }
 .stage-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 #stageDims { font-family: var(--mono); font-size: 12px; color: var(--text); }
@@ -414,7 +419,8 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid #273043;
+  background:rgba(19, 24, 33, .72);
   font-family: var(--mono);
   font-size: 10px;
   color: var(--dim);
@@ -723,14 +729,14 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---------------------------------------------------------------- abas */
 
-.tabs { display: flex; gap: 4px; margin-left: 20px; }
+.tabs { display: flex; gap: 2px; margin-left: 20px; padding: 3px; border:1px solid #222938; border-radius:8px; background:#11151e; }
 
 .tab-btn {
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
   padding: 6px 12px;
-  border-radius: 7px;
+  border-radius: 5px;
   cursor: pointer;
   font-size: 12px;
   font-family: var(--sans);
@@ -739,8 +745,8 @@ input[type="range"]::-moz-range-thumb {
   gap: 7px;
   transition: color 0.12s, background 0.12s;
 }
-.tab-btn:hover { color: var(--text); background: #171c27; }
-.tab-btn.active { color: var(--text); background: #1b2130; border-color: var(--line); }
+.tab-btn:hover { color: var(--text); background: #1c2230; }
+.tab-btn.active { color: var(--text); background: #252d3d; border-color: #36425a; box-shadow:inset 0 1px rgba(255,255,255,.06); }
 
 .tab-count {
   font-family: var(--mono);
@@ -755,7 +761,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---------------------------------------------------------------- biblioteca */
 
-.library-wrap { height: 100%; overflow-y: auto; padding: 18px 20px 40px; }
+.library-wrap { height: 100%; overflow-y: auto; padding: 18px 20px 40px; background:rgba(12,15,21,.45); }
 
 .library-head {
   display: flex;
@@ -775,9 +781,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .lib-card {
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: linear-gradient(180deg, #1a202c, #141821);
+  border: 1px solid #293142;
+  border-radius: 6px;
   padding: 10px;
   display: flex;
   flex-direction: column;
