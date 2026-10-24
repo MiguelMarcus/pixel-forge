@@ -583,6 +583,10 @@
     return { width: composed.width, height: composed.height, indices: indices, transparentIndex: remap[composed.transparentIndex], outlineIndex: -1, palette: palette };
   }
 
+  function composeForOutput(list) {
+    return filteredCompose(PF.composeSheet(sheet.width, sheet.height, list || resolvePlacements()));
+  }
+
   function snapValue(v, isY) {
     if (!sheet.snap) return Math.round(v);
     if (sheet.mode === 'grid') return Math.round(v / sheet.cell) * sheet.cell;
@@ -614,12 +618,13 @@
     ctx.imageSmoothingEnabled = false;
 
     var list = resolvePlacements();
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i];
-      var c = assetCanvas(findItem(p.assetId));
-      ctx.drawImage(c, p.x * z, p.y * z, c.width * z, c.height * z);
-    }
-    applyPreviewFilter(ctx, dw, dh);
+    try {
+      var composed = composeForOutput(list);
+      var base = document.createElement('canvas'); base.width = composed.width; base.height = composed.height;
+      var baseCtx = base.getContext('2d'), image = baseCtx.createImageData(composed.width, composed.height), rgba = PF.toRGBA(composed);
+      image.data.set(rgba.data); baseCtx.putImageData(image, 0, 0);
+      ctx.drawImage(base, 0, 0, dw, dh);
+    } catch (e) { /* validateNow mostra o erro detalhado */ }
 
     if (sheet.mode === 'grid') {
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -736,7 +741,7 @@
     var list = resolvePlacements();
     var composed;
     try {
-      composed = filteredCompose(PF.composeSheet(sheet.width, sheet.height, list));
+      composed = composeForOutput(list);
     } catch (e) {
       $('sheetVerdict').textContent = 'ERRO';
       $('sheetVerdict').className = 'verdict fail';
@@ -1440,10 +1445,12 @@
       sheetFilter().preset = e.target.value;
       renderAll(); saveSheet();
     });
-    $('sheetNormalize').addEventListener('change', function (e) {
+    function changeNormalize(e) {
       sheetFilter().normalize = e.target.value;
       renderAll(); saveSheet();
-    });
+    }
+    $('sheetNormalize').addEventListener('change', changeNormalize);
+    $('sheetNormalize').addEventListener('input', changeNormalize);
     ['sheetBrightness', 'sheetContrast'].forEach(function (id) {
       $(id).addEventListener('input', function (e) {
         var key = id === 'sheetBrightness' ? 'brightness' : 'contrast';
