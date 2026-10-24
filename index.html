@@ -53,6 +53,9 @@
 
       <div class="source-name" id="fileName">nenhuma imagem</div>
 
+      <button class="btn ghost sm block" id="segmentButton" type="button" disabled>Remover fundo (IA local)</button>
+      <div class="mini" id="segmentStatus">Primeiro uso: baixa modelo e runtime (~64 MiB); imagem fica neste dispositivo.</div>
+
       <div class="row gap">
         <button class="btn ghost sm" id="samplePotion" type="button">Exemplo: poção</button>
         <button class="btn ghost sm" id="sampleSlime" type="button">Exemplo: slime</button>
@@ -124,8 +127,9 @@
       <label class="field">
         <span>Amostragem</span>
         <select id="resampleMode">
+          <option value="shape">preservar forma (recomendado para sprites)</option>
           <option value="structure">análise de regiões (mais lenta)</option>
-          <option value="clean">pixel art limpa (recomendado)</option>
+          <option value="clean">pixel art limpa (cores por área)</option>
           <option value="dominant">dominante (tons originais)</option>
           <option value="box">média (box)</option>
           <option value="nearest">mais próximo</option>
@@ -686,6 +690,7 @@
 <script src="src/lighting-tab.js"></script>
 <script src="src/library.js"></script>
 <script src="src/tabs.js"></script>
+<script src="src/segmentation.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

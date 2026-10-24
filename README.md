@@ -31,7 +31,7 @@ Nada do modelo vai direto pro jogo. A ordem importa:
 |---|-------|---------|
 | 1 | remoção de fundo (opcional) | flood fill **a partir das bordas**, então um olho branco dentro do sprite sobrevive |
 | 2 | recorte ao conteúdo | o sprite passa a preencher o quadro |
-| 3 | reamostragem pra grade | `dominante` / `box` / `nearest` (ver abaixo) |
+| 3 | reamostragem pra grade | `shape` / `clean` / `dominante` / `box` / `nearest` (ver abaixo) |
 | 4 | limiar de alpha | alpha vira 0 ou 255; sem semitransparência |
 | 5 | quantização + dither | toda cor passa a ser um índice da paleta |
 | 6 | limpeza de órfãos | remove pixels isolados que sobraram da quantização |
@@ -94,12 +94,13 @@ A paleta extraída sai **ordenada em rampas** (família de matiz, do escuro pro 
 não muda a quantização — a busca é por proximidade —, mas faz o `.gpl` e o painel do Aseprite
 lerem como rampa em vez de ordem aleatória.
 
-### Por que "dominante" é o padrão
+### Escolha da amostragem
 
 Média (`box`) de uma célula que contém borda azul e fundo branco produz **cinza** — uma cor que
 não existe em nenhum dos dois. É daí que vem aquele aspecto "lavado" de pixel art gerada por IA.
-A amostragem `dominante` agrupa os pixels da célula por cor e escolhe a cor mais frequente, então
-a célula herda uma cor que realmente existia ali.
+A amostragem `dominante` escolhe a cor mais frequente da célula; `clean` primeiro aproxima as
+cores à paleta. Para personagens e objetos, `shape` também usa a paleta, mas favorece o pixel
+central quando a votação por área é próxima, ajudando a manter contornos e detalhes alinhados.
 
 ---
 
@@ -413,24 +414,41 @@ O servidor só oferece os arquivos estáticos do aplicativo, no próprio computa
 O endereço local tem armazenamento separado do HTML direto e do Pages: para
 transferir sua biblioteca, salve e importe o backup `.pfset`.
 
-Para uma análise adicional, escolha **análise de regiões (mais lenta)** em
-**Amostragem**. Antes da redução, um filtro de vizinhança atenua variações pequenas
-de cor e limita a mistura através de bordas de alto contraste. Depois de agrupar
-os tons na paleta, ele remove apenas pontos isolados de baixo contraste cercados
-por uma região opaca quase uniforme (com dithering desligado). Linhas conectadas,
-brilhos fortes e pixels junto à transparência não passam por essa limpeza final.
-A limpeza também considera ilhas completas de 2×2 pixels de baixo contraste,
-somente quando cercadas por uma única cor opaca e sem conexões diagonais.
-A votação mantém cores exatas da paleta e desempata de forma estável.
-A análise usa uma resolução intermediária limitada e não é aplicada em tamanho
-nativo. Trata-se de processamento local de cores e vizinhança, sem IA semântica.
-Pode suavizar pequenos detalhes de baixo contraste: compare os dois modos.
+Os perfis de personagem e objeto usam **preservar forma** por padrão. O modo
+converte as cores para a paleta escolhida e analisa a cobertura de cada região
+diretamente na imagem original. Quando a votação fica próxima, usa a cor no
+centro da região como desempate — isso ajuda a manter contornos e detalhes
+coerentes sem suavizar toda a imagem. Em bordas semitransparentes, também usa
+o pixel central para decidir de que lado fica a silhueta; traços estreitos
+conectados ao pixel central podem sobreviver mesmo quando ocupam uma pequena
+parte da célula. Pontos isolados são descartados. Não consegue recriar detalhes
+menores que a grade final, mas evita apagar tantos detalhes conectados quanto
+uma votação de maioria simples. Receitas salvas mantêm sua opção anterior.
 
-Em **Amostragem**, escolha **pixel art limpa** para reduzir ilustrações grandes.
-Esse modo reúne os tons na paleta escolhida antes de selecionar a cor dominante
-de cada pixel de saída. Assim, variações próximas da mesma cor não dividem seus
-votos e não favorecem pequenos pontos de outra cor. É o padrão de novos perfis
-de personagem e objeto; receitas salvas mantêm sua opção anterior.
+**Pixel art limpa** continua disponível: agrupa os tons pela paleta e escolhe a
+cor de maior cobertura em cada pixel, sem favorecer a posição central. **Análise
+de regiões** aplica uma suavização local antes de reduzir; pode ajudar em imagens
+ruidosas, mas suavizar detalhes pequenos. Esses modos podem ser comparados em
+**Amostragem**. A análise de regiões roda em Worker quando disponível e não usa
+IA semântica.
+
+### Segmentação local do primeiro plano
+
+Em **Entrada**, **Remover fundo (IA local)** usa ISNet para estimar uma máscara
+do objeto e aplicá-la como transparência. A análise roda no próprio navegador;
+os pixels da imagem não são enviados. Na primeira utilização, o navegador
+precisa baixar o modelo quantizado (cerca de 42 MiB) e o runtime WebAssembly
+(cerca de 21 MiB): aproximadamente 64 MiB no total. O navegador mantém os
+arquivos no cache quando possível. A função só é executada após
+clicar no botão, e **Restaurar imagem original** desfaz a máscara durante a
+edição atual. Confira sempre o recorte: modelos podem errar em arte estilizada,
+objetos sobrepostos ou fundos complexos.
+
+O modelo [ISNet quantizado](https://huggingface.co/xrds/isnet-general-onnx-int8)
+é distribuído sob licença MIT. A inferência usa
+[@huggingface/transformers](https://github.com/huggingface/transformers.js),
+licenciado sob Apache-2.0 e carregado sob demanda; runtime e pesos vêm de jsDelivr e Hugging Face,
+respectivamente. É necessário acesso à internet para o primeiro carregamento.
 
 Use dithering **nenhum** para áreas de cor uniformes. A paleta continua importante:
 cores ausentes nela serão substituídas. A redução não redesenha contornos nem

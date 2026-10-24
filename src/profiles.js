@@ -25,7 +25,7 @@
       autoBg: true,
       defaults: {
         sizeW: 64, sizeH: 64,
-        mode: 'clean', fit: 'contain', align: 'bottom', margin: 1,
+        mode: 'shape', fit: 'contain', align: 'bottom', margin: 1,
         autoCrop: true, removeBg: true, bgTolerance: 32,
         alpha: 128, dither: 'none', ditherAmount: 50,
         outline: true, outlineRadius: 1, outlineDiag: false,
@@ -49,7 +49,7 @@
       autoBg: true,
       defaults: {
         sizeW: 64, sizeH: 64,
-        mode: 'clean', fit: 'contain', align: 'center', margin: 1,
+        mode: 'shape', fit: 'contain', align: 'center', margin: 1,
         autoCrop: true, removeBg: true, bgTolerance: 32,
         alpha: 128, dither: 'none', ditherAmount: 50,
         outline: true, outlineRadius: 1, outlineDiag: false,

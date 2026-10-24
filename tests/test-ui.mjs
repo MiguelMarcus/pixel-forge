@@ -23,6 +23,7 @@ require('../src/library.js');
 
 globalThis.self = globalThis;
 globalThis.PF = PF;
+require('../src/segmentation.js');
 require('../src/lighting-tab.js');
 require('../src/tabs.js');
 
@@ -234,6 +235,12 @@ ok(g('exportPng').disabled === false, 'export habilitado');
 ok(g('exportAseprite').disabled === false, 'export .aseprite habilitado');
 ok(typeof windowStub.PF.encodeAseprite === 'function', 'encoder .aseprite carregado');
 ok(g('gridOverlay').style.backgroundSize === '8px 8px', 'grade acompanha o zoom', g('gridOverlay').style.backgroundSize);
+PF.segmentForeground = async (image) => PF.applyForegroundMask(image, new Uint8Array(image.width * image.height).fill(200));
+g('segmentButton').dispatch('click');
+await new Promise((r) => setTimeout(r, 10));
+ok(g('segmentButton').textContent === 'Restaurar imagem original', 'segmentação pode ser desfeita');
+g('segmentButton').dispatch('click');
+ok(g('segmentButton').textContent === 'Remover fundo (IA local)', 'imagem original pode ser restaurada');
 
 console.log('\n== 4. controles reprocessam ==');
 let ctrlError = null;

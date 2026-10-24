@@ -14,6 +14,9 @@
 
   var state = {
     source: null,
+    sourceBeforeSegmentation: null,
+    segmentationRemoveBg: null,
+    segmentationRun: 0,
     sourceName: '',
     result: null,
     profile: 'character',
@@ -178,7 +181,10 @@
   }
 
   function loadItem(item, silent) {
+    state.segmentationRun++;
     state.source = item.source;
+    state.sourceBeforeSegmentation = null;
+    state.segmentationRemoveBg = null;
     state.sourceName = item.name;
     state.profile = item.profile || state.profile;
     state.params = JSON.parse(JSON.stringify(item.params));
@@ -192,6 +198,7 @@
     syncControls();
     recompute();
     $('fileName').textContent = state.sourceName + ' · ' + state.source.width + '×' + state.source.height;
+    updateSegmentationControls();
     if (!silent) {
       PF.tabs.markDirty();
       PF.tabs.switchTab('sprite');
@@ -208,6 +215,10 @@
       return;
     }
     state.source = null; state.result = null; state.sourceName = ''; state.prepared = null;
+    state.sourceBeforeSegmentation = null;
+    state.segmentationRemoveBg = null;
+    state.segmentationRun++;
+    updateSegmentationControls();
     $('fileName').textContent = 'nenhuma imagem';
     $('emptyState').classList.remove('hidden'); $('compare').classList.add('hidden');
     $('stageDims').textContent = '—'; $('stageInfo').textContent = '';
@@ -649,6 +660,9 @@
   /* ---------------------------------------------------------------- source */
 
   function setSource(image, name) {
+    state.segmentationRun++;
+    state.sourceBeforeSegmentation = null;
+    state.segmentationRemoveBg = null;
     var maxDim = Math.max(image.width, image.height);
     if (maxDim > MAX_SOURCE) {
       var s = MAX_SOURCE / maxDim;
@@ -679,9 +693,75 @@
     $('bgRemove').checked = !!state.params.removeBg;
 
     $('fileName').textContent = state.sourceName + ' · ' + image.width + '×' + image.height;
+    updateSegmentationControls();
     setEyedropper(false);
     syncBgOpts();
     recompute();
+  }
+
+  function updateSegmentationControls() {
+    var button = $('segmentButton');
+    button.disabled = !state.source;
+    button.textContent = state.sourceBeforeSegmentation
+      ? 'Restaurar imagem original'
+      : 'Remover fundo (IA local)';
+    $('segmentStatus').textContent = state.sourceBeforeSegmentation
+      ? 'Máscara aplicada; a imagem original pode ser restaurada.'
+      : 'Primeiro uso: baixa modelo e runtime (~64 MiB); imagem fica neste dispositivo.';
+  }
+
+  async function toggleSegmentation() {
+    if (state.sourceBeforeSegmentation) {
+      state.source = state.sourceBeforeSegmentation;
+      state.sourceBeforeSegmentation = null;
+      if (state.segmentationRemoveBg !== null) {
+        state.params.removeBg = state.segmentationRemoveBg;
+        $('bgRemove').checked = !!state.params.removeBg;
+      }
+      state.segmentationRemoveBg = null;
+      updateSegmentationControls();
+      syncBgOpts();
+      PF.tabs.markDirty();
+      recompute();
+      toast('Imagem original restaurada.');
+      return;
+    }
+    if (!state.source || !PF.segmentForeground) {
+      toast('Segmentação local indisponível.');
+      return;
+    }
+
+    var image = state.source;
+    var run = ++state.segmentationRun;
+    var button = $('segmentButton');
+    button.disabled = true;
+    $('segmentStatus').textContent = 'Carregando modelo de segmentação local…';
+    try {
+      var masked = await PF.segmentForeground(image, function (progress) {
+        if (run !== state.segmentationRun) return;
+        if (progress && progress.status === 'progress' && isFinite(progress.progress)) {
+          $('segmentStatus').textContent = 'Baixando modelo: ' + Math.round(progress.progress) + '%';
+        }
+      });
+      if (run !== state.segmentationRun || state.source !== image) return;
+      state.sourceBeforeSegmentation = image;
+      state.segmentationRemoveBg = state.params.removeBg;
+      state.params.removeBg = false;
+      $('bgRemove').checked = false;
+      state.source = masked;
+      PF.tabs.markDirty();
+      updateSegmentationControls();
+      syncBgOpts();
+      recompute();
+      toast('Fundo separado localmente. Confira a silhueta antes de exportar.');
+    } catch (error) {
+      if (run !== state.segmentationRun) return;
+      console.error(error);
+      $('segmentStatus').textContent = 'Falha ao carregar ou executar o modelo.';
+      toast('Não consegui segmentar: ' + (error.message || 'falha no modelo'));
+    } finally {
+      if (run === state.segmentationRun) updateSegmentationControls();
+    }
   }
 
   function decodeDataURLToImage(url) {
@@ -1205,6 +1285,10 @@
     state.profile = id;
     state.params = PF.profileParams(id);
     state.params.bgColor = keepBg || '#ffffff';
+    if (state.sourceBeforeSegmentation) {
+      state.segmentationRemoveBg = state.params.removeBg;
+      state.params.removeBg = false;
+    }
     state.contract = PF.profileContract(id);
     state.paletteMode = state.params.palette || 'pico8';
     if (!PALETTES[state.paletteMode]) state.paletteMode = 'pico8';
@@ -1325,6 +1409,7 @@
       var s = samplePotion();
       setSource(s.image, s.name);
     });
+    $('segmentButton').addEventListener('click', toggleSegmentation);
     $('sampleSlime').addEventListener('click', function () {
       var s = sampleSlime();
       setSource(s.image, s.name);
@@ -1332,6 +1417,7 @@
 
     $('bgRemove').addEventListener('change', function (e) {
       state.params.removeBg = e.target.checked;
+      if (state.sourceBeforeSegmentation) state.segmentationRemoveBg = null;
       syncBgOpts();
       schedule();
     });

@@ -52,6 +52,55 @@ test('votação limpa preserva cores próximas e desempata sem depender do espel
   assert.deepEqual(PF.resample(image,1,1,'dominant').data,before.data);
 });
 
+test('modo forma preserva detalhes coerentes e ancora bordas na imagem original', () => {
+  const image=PF.createImage(4,2);
+  image.data.fill(255);
+  for(let i=0;i<8;i++) image.data.set([30,30,30,255],i*4);
+  [2,6,7].forEach(i=>image.data.set([230,40,40,255],i*4));
+  const result=PF.resample(image,1,1,'shape');
+  assert.deepEqual([...result.data],[230,40,40,255]);
+
+  const noisy=PF.createImage(4,4);
+  for(let i=0;i<16;i++) noisy.data.set([30,30,30,255],i*4);
+  noisy.data.set([230,40,40,255],(5*4));
+  assert.deepEqual([...PF.resample(noisy,1,1,'shape').data],[30,30,30,255]);
+
+  const edge=PF.createImage(2,1);
+  edge.data.set([30,30,30,255,0,0,0,0]);
+  assert.equal(PF.resample(edge,1,1,'clean').data[3],128);
+  assert.equal(PF.resample(edge,1,1,'shape').data[3],255);
+
+  const stroke=PF.createImage(8,8);
+  for(let y=0;y<8;y++) stroke.data.set([230,40,40,255],(y*8+4)*4);
+  assert.equal(PF.alphaThreshold(PF.resample(stroke,1,1,'clean'),128).data[3],0);
+  assert.equal(PF.resample(stroke,1,1,'shape').data[3],255);
+  const speck=PF.createImage(8,8);
+  speck.data.set([230,40,40,255],(4*8+4)*4);
+  assert.equal(PF.resample(speck,1,1,'shape').data[3],0);
+
+  const original=PF.createImage(8,8);
+  for(let i=0;i<64;i++) original.data.set([30,30,30,255],i*4);
+  const before=[...original.data];
+  const resultFromSource=PF.conform(original,{
+    targetW:2,targetH:2,mode:'shape',doAutoCrop:false,
+    palette:[{r:30,g:30,b:30,a:255}],contract:{}
+  });
+  assert.equal(resultFromSource.stages.paletteBeforeReduction,true);
+  assert.equal(resultFromSource.stages.regionAnalysis,undefined);
+  assert.deepEqual([...original.data],before);
+  assert.equal(PF.profileParams('character').mode,'shape');
+  assert.equal(PF.profileParams('prop').mode,'shape');
+});
+
+test('máscara local combina confiança com alpha sem mutar a imagem de origem', () => {
+  const image=PF.createImage(2,1);
+  image.data.set([100,80,60,255,20,30,40,128]);
+  const masked=PF.applyForegroundMask(image,new Uint8Array([255,64]));
+  assert.deepEqual([...masked.data],[100,80,60,255,20,30,40,32]);
+  assert.deepEqual([...image.data],[100,80,60,255,20,30,40,128]);
+  assert.throws(()=>PF.applyForegroundMask(image,new Uint8Array([255])),/máscara de segmentação/);
+});
+
 test('bordas fortes são preservadas em todos os canais', () => {
   for(let channel=0;channel<3;channel++) {
     const image=PF.createImage(12,8);

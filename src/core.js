@@ -103,6 +103,17 @@
     return { width: img.width, height: img.height, data: new Uint8ClampedArray(img.data) };
   }
 
+  function applyForegroundMask(img, mask) {
+    if (!mask || mask.length !== img.width * img.height) {
+      throw new Error('máscara de segmentação incompatível com a imagem');
+    }
+    var out = cloneImage(img);
+    for (var i = 0; i < mask.length; i++) {
+      out.data[i * 4 + 3] = Math.round(out.data[i * 4 + 3] * mask[i] / 255);
+    }
+    return out;
+  }
+
   function clamp8(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
 
   /* Remove fundo por flood fill a partir das bordas. Só apaga o que é
@@ -199,7 +210,7 @@
     var sd = src.data, od = out.data;
     var dom = null;
 
-    var exact = mode === 'clean' || mode === 'structure';
+    var exact = mode === 'clean' || mode === 'structure' || mode === 'shape';
     if (mode === 'dominant') {
       if (!DOM_BUF) {
         DOM_BUF = {
@@ -235,6 +246,14 @@
           var si = (sy * sw + sx) * 4;
           od[o] = sd[si]; od[o + 1] = sd[si + 1]; od[o + 2] = sd[si + 2]; od[o + 3] = sd[si + 3];
           continue;
+        }
+
+        var center = null;
+        var centerX = 0, centerY = 0;
+        if (mode === 'shape') {
+          centerX = Math.min(sw - 1, Math.floor(((x + 0.5) * sw) / dw));
+          centerY = Math.min(sh - 1, Math.floor(((y + 0.5) * sh) / dh));
+          center = (centerY * sw + centerX) * 4;
         }
 
         var sa = 0, sr = 0, sg = 0, sb = 0, n = 0, countA = 0, nKeys = 0;
@@ -279,6 +298,24 @@
         }
 
         var alpha = Math.round(countA / n);
+        if (mode === 'shape') {
+          var connectedCenter = false;
+          if (sd[center + 3] >= 128) {
+            for (var oy = -1; oy <= 1 && !connectedCenter; oy++) {
+              for (var ox = -1; ox <= 1; ox++) {
+                if (!ox && !oy) continue;
+                var nx = centerX + ox, ny = centerY + oy;
+                if (nx >= 0 && nx < sw && ny >= 0 && ny < sh &&
+                    sd[(ny * sw + nx) * 4 + 3] >= 128) {
+                  connectedCenter = true;
+                  break;
+                }
+              }
+            }
+          }
+          // Preserve a connected thin stroke through the cell center, not isolated noise.
+          alpha = alpha >= 128 || (connectedCenter && alpha >= 32) ? 255 : 0;
+        }
         od[o + 3] = alpha;
 
         if (votes) {
@@ -289,6 +326,12 @@
               winner = key; winnerWeight = value;
             }
           });
+          if (mode === 'shape') {
+            var centerKey = (sd[center] << 16) | (sd[center + 1] << 8) | sd[center + 2];
+            var centerWeight = votes.get(centerKey) || 0;
+            // Keep centered details with meaningful area support, not isolated specks.
+            if (centerWeight >= winnerWeight * 0.35) winner = centerKey;
+          }
           od[o] = winner >> 16; od[o + 1] = (winner >> 8) & 255; od[o + 2] = winner & 255;
         } else if (dom) {
           var bestKey = -1, bestN = -1;
@@ -1172,7 +1215,7 @@
 
     // Resolve competing shades into the final palette before counting votes.
     // Keep alpha independent: pre-quantization must not expand the silhouette.
-    if ((o.mode === 'clean' || o.mode === 'structure') && reducing) {
+    if ((o.mode === 'clean' || o.mode === 'structure' || o.mode === 'shape') && reducing) {
       var groupColors = o.palette.filter(function (color) { return color.a > 0; });
       if (!groupColors.length) throw new Error('paleta vazia');
       var groupCache = new Map();
@@ -1682,6 +1725,7 @@
     parsePalette: parsePalette,
     paletteFromHexList: paletteFromHexList,
     createImage: createImage,
+    applyForegroundMask: applyForegroundMask,
     cloneImage: cloneImage,
     removeBackground: removeBackground,
     removeBlackWhite: removeBlackWhite,
